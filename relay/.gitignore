@@ -1,0 +1,6 @@
+.env
+
+.relay/
+
+__debug_bin*
+.tor/

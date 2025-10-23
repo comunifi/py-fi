@@ -1,0 +1,53 @@
+services:
+  db:
+    container_name: relay-db
+    build:
+      context: .
+      dockerfile: ./.docker/db/Dockerfile
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - ./.relay/data:/var/lib/postgresql/data
+    networks:
+      relay-net:
+        aliases:
+          - relay-db
+    ports:
+      - "5432:5432"
+    restart: on-failure
+    healthcheck:
+      test: "exit 0"
+  tor:
+    image: dockurr/tor
+    container_name: tor
+    ports:
+      - 9050:9050
+      - 9051:9051
+    volumes:
+      - ./config:/etc/tor
+      - ./data:/var/lib/tor
+    restart: always
+    healthcheck:
+      test: "exit 0"
+  relay:
+    container_name: relay
+    build:
+      context: .
+      dockerfile: ./.docker/relay/Dockerfile
+    networks:
+      relay-net:
+        aliases:
+          - relay
+    ports:
+      - "3334:3334"
+    restart: on-failure
+    healthcheck:
+      test: "exit 0"
+
+networks:
+  relay-net:
+    name: relay-net
+  supabase_default:
+    external: true
