@@ -9,6 +9,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flywind:
+    path: ../../flywind
+  lucide_icons: ^0.257.0
+  blockies: ^0.1.2
 
 dev_dependencies:
   flutter_test:
