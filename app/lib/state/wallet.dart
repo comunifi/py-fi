@@ -5,6 +5,7 @@ import 'package:app/services/config/service.dart';
 import 'package:app/services/photos/photos.dart';
 import 'package:app/services/secure/secure.dart';
 import 'package:app/services/wallet/contracts/profile.dart';
+import 'package:app/services/wallet/models/userop.dart';
 import 'package:app/services/wallet/utils.dart';
 import 'package:app/services/wallet/wallet.dart';
 import 'package:app/utils/currency.dart';
@@ -353,5 +354,63 @@ class WalletState extends ChangeNotifier {
       sendingRequests[id] = 'Request Complete';
       safeNotifyListeners();
     }
+  }
+
+  Future<UserOp?> signUserOp(String id, String to, double amount) async {
+    try {
+      debugPrint('Sending request: $id');
+      debugPrint('To: $to');
+      debugPrint('Amount: $amount');
+      sendingRequests[id] = 'In Progress';
+      sending = true;
+      safeNotifyListeners();
+
+      final token = _config.getPrimaryToken();
+
+      final parsedAmount = toUnit(amount.toString(), decimals: token.decimals);
+
+      if (parsedAmount == BigInt.zero) {
+        return null;
+      }
+
+      final credentials = _secureService.getCredentials();
+      if (credentials == null) {
+        throw Exception('Credentials not found');
+      }
+
+      final (_, key) = credentials;
+
+      final privateKey = EthPrivateKey.fromHex(key);
+
+      final account = await _config.accountFactoryContract.getAddress(
+        privateKey.address.hexEip55,
+      );
+
+      final calldata = tokenTransferCallData(
+        _config,
+        account,
+        to,
+        parsedAmount,
+      );
+
+      final (_, userop) = await prepareUserop(
+        _config,
+        account,
+        privateKey,
+        [token.address],
+        [calldata],
+      );
+
+      return userop;
+    } catch (e, s) {
+      debugPrint('Error sending back: $e');
+      debugPrint('Stack trace: $s');
+    } finally {
+      sending = false;
+      sendingRequests[id] = 'Request Complete';
+      safeNotifyListeners();
+    }
+
+    return null;
   }
 }

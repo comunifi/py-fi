@@ -19,6 +19,7 @@ class SimpleNewPostScreen extends StatefulWidget {
   final Function() onSendBack;
   final Function(String, String, String, double) onRequest;
   final Function(String, String, String, double)? onContribute;
+  final Function(String, String, String, double)? onCrowdfund;
   final String? contributeToUsername;
   final String? contributeToAddress;
   final double? contributeAmount;
@@ -28,6 +29,7 @@ class SimpleNewPostScreen extends StatefulWidget {
     required this.onSendBack,
     required this.onRequest,
     this.onContribute,
+    this.onCrowdfund,
     this.contributeToUsername,
     this.contributeToAddress,
     this.contributeAmount,
@@ -40,31 +42,30 @@ class SimpleNewPostScreen extends StatefulWidget {
 class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
   final TextEditingController _postController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
-  
+
   // Transaction state for request functionality
   TransactionEntry? _transaction;
   final TextEditingController _amountController = TextEditingController();
-  String _mode = 'none'; // 'send', 'request', 'crowdfund', 'contribute', or 'none'
+  String _mode =
+      'none'; // 'send', 'request', 'crowdfund', 'contribute', or 'none'
 
   @override
   void initState() {
     super.initState();
-    
+
     // Initialize contribute mode if contribute data is provided
-    if (widget.onContribute != null && 
-        widget.contributeToUsername != null && 
+    if (widget.onContribute != null &&
+        widget.contributeToUsername != null &&
         widget.contributeToAddress != null) {
       _mode = 'contribute';
       _transaction = TransactionEntry(
         recipient: widget.contributeToAddress!,
-        amount: widget.contributeAmount ?? 0.0,
+        username: widget.contributeToUsername,
+        amount: 0.0,
         currency: 'PYUSD',
       );
-      if (widget.contributeAmount != null) {
-        _amountController.text = widget.contributeAmount!.toString();
-      }
     }
-    
+
     // Auto-focus the text input when the screen opens
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
@@ -86,15 +87,44 @@ class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
     } else if (_mode == 'request' && _transaction != null) {
       handleRequest(
         _transaction!.recipient,
-        _transaction!.recipient, // Using recipient as both username and address for now
+        _transaction!.recipient,
         _transaction!.amount,
       );
     } else if (_mode == 'contribute' && _transaction != null) {
       handleContribute(
-        widget.contributeToUsername ?? _transaction!.recipient,
+        widget.contributeToUsername ?? _transaction!.username ?? '',
         widget.contributeToAddress ?? _transaction!.recipient,
         _transaction!.amount,
       );
+    } else if (_mode == 'crowdfund' && _transaction != null) {
+      final fromProfile = context.read<ProfileState>().fromProfile;
+
+      debugPrint('Crowdfund validation:');
+      debugPrint('  fromProfile: $fromProfile');
+      debugPrint('  fromProfile?.username: ${fromProfile?.username}');
+      debugPrint('  fromProfile?.account: ${fromProfile?.account}');
+      debugPrint('  _transaction.recipient: ${_transaction!.recipient}');
+      debugPrint('  _transaction.amount: ${_transaction!.amount}');
+
+      if (fromProfile == null) {
+        debugPrint('Error: Please select a recipient');
+        // TODO: Show error to user
+        return;
+      }
+
+      if (_transaction!.amount <= 0) {
+        debugPrint('Error: Please enter a goal amount');
+        // TODO: Show error to user
+        return;
+      }
+
+      widget.onCrowdfund!(
+        _postController.text,
+        fromProfile.username,
+        fromProfile.account,
+        _transaction!.amount,
+      );
+      GoRouter.of(context).pop();
     } else {
       // Regular post
       GoRouter.of(context).pop(_postController.text);
@@ -187,7 +217,7 @@ class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
         children: [
           // Balance widget at the top - now using dynamic balance
           Balance(balance: balance),
-          
+
           // Action buttons row (hide in contribute mode)
           if (_mode != 'contribute')
             FlyBox(
@@ -199,11 +229,9 @@ class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
                       ? ButtonColor.primary
                       : ButtonColor.secondary,
                   variant: ButtonVariant.solid,
-                  children: [
-                    FlyText('Send').text('sm').weight('medium'),
-                  ],
+                  children: [FlyText('Send').text('sm').weight('medium')],
                 ),
-                
+
                 // Request button
                 FlyButton(
                   onTap: _toggleRequest,
@@ -211,11 +239,9 @@ class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
                       ? ButtonColor.primary
                       : ButtonColor.secondary,
                   variant: ButtonVariant.solid,
-                  children: [
-                    FlyText('Request').text('sm').weight('medium'),
-                  ],
+                  children: [FlyText('Request').text('sm').weight('medium')],
                 ),
-                
+
                 // Crowdfund button
                 FlyButton(
                   onTap: _toggleCrowdfund,
@@ -223,9 +249,7 @@ class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
                       ? ButtonColor.primary
                       : ButtonColor.secondary,
                   variant: ButtonVariant.solid,
-                  children: [
-                    FlyText('Crowdfund').text('sm').weight('medium'),
-                  ],
+                  children: [FlyText('Crowdfund').text('sm').weight('medium')],
                 ),
               ],
             ).row().gap('s3').mb('s4'),
@@ -260,7 +284,9 @@ class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
                 variant: ButtonVariant.solid,
                 buttonColor: ButtonColor.primary,
                 size: ButtonSize.large,
-                child: FlyText(_mode == 'contribute' ? 'Contribute' : 'Post').text('sm').weight('medium'),
+                child: FlyText(
+                  _mode == 'crowdfund' ? 'Crowdfund' : 'Post',
+                ).text('sm').weight('medium'),
               ),
             ],
           ).row().justify('end'),
@@ -278,15 +304,15 @@ class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
     // Check if this is crowdfund or contribute mode
     final isCrowdfund = _mode == 'crowdfund';
     final isContribute = _mode == 'contribute';
-    
+
     return FlyCardWithHeader(
-      title: isContribute 
+      title: isContribute
           ? 'Contribute to Crowdfund'
-          : (isCrowdfund 
-              ? 'Crowdfund' 
-              : (isSend ? 'Send Tokens' : 'Request Tokens')),
+          : (isCrowdfund
+                ? 'Crowdfund'
+                : (isSend ? 'Send Tokens' : 'Request Tokens')),
       headerIcon: isContribute || isCrowdfund
-          ? LucideIcons.target 
+          ? LucideIcons.target
           : (isSend ? LucideIcons.arrowUpRight : LucideIcons.arrowDownLeft),
       headerActionIcon: LucideIcons.trash2,
       onHeaderActionTap: () {
@@ -305,7 +331,9 @@ class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
             if (!isContribute)
               FlyBox(
                 children: [
-                  FlyText(isSend || isCrowdfund ? 'to' : 'from').text('sm').color('gray600'),
+                  FlyText(
+                    isSend || isCrowdfund ? 'to' : 'from',
+                  ).text('sm').color('gray600'),
                   if (loadingFromProfile) CupertinoActivityIndicator(),
                   Expanded(
                     child: FlyBox(
@@ -313,10 +341,13 @@ class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
                         CupertinoTextField(
                           keyboardType: TextInputType.text,
                           style: const TextStyle(fontSize: 14),
-                          placeholder: isCrowdfund ? 'user name' : 'address or username',
+                          placeholder: isCrowdfund
+                              ? 'user name'
+                              : 'address or username',
                           onChanged: (value) {
-                            // Handle text input for profile search
-                            context.read<ProfileState>().searchFromProfile(value);
+                            context.read<ProfileState>().searchFromProfile(
+                              value,
+                            );
                           },
                         ),
                       ],
@@ -346,18 +377,31 @@ class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
             // Second row: Amount/Goal input
             FlyBox(
               children: [
-                FlyText(isCrowdfund ? 'goal' : 'amount').text('sm').color('gray600'),
+                FlyText(
+                  isCrowdfund ? 'goal' : 'amount',
+                ).text('sm').color('gray600'),
                 Expanded(
                   child: CupertinoTextField(
                     controller: _amountController,
-                    keyboardType: TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     style: const TextStyle(fontSize: 14),
-                    placeholder: isCrowdfund ? '# PYUSD' : (isContribute ? '0.00' : '0.00'),
+                    placeholder: isCrowdfund
+                        ? '# PYUSD'
+                        : (isContribute ? '0.00' : '0.00'),
                     onChanged: (value) {
                       final amount = double.tryParse(value) ?? 0.0;
+                      final recipientValue = isContribute
+                          ? (widget.contributeToAddress ?? '')
+                          : (fromProfile?.account ?? '');
+                      final usernameValue = isContribute
+                          ? widget.contributeToUsername
+                          : fromProfile?.username;
                       setState(() {
                         _transaction = TransactionEntry(
-                          recipient: fromProfile?.account ?? '',
+                          recipient: recipientValue,
+                          username: usernameValue,
                           amount: amount,
                           currency: 'PYUSD',
                         );
@@ -377,11 +421,13 @@ class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
 
 class TransactionEntry {
   String recipient;
+  String? username;
   double amount;
   String currency;
 
   TransactionEntry({
     required this.recipient,
+    this.username,
     required this.amount,
     required this.currency,
   });

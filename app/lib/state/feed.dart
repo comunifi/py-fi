@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:app/models/nostr_event.dart';
 import 'package:app/models/post.dart';
 import 'package:app/services/nostr/nostr.dart';
+import 'package:app/services/wallet/models/userop.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
@@ -14,7 +15,6 @@ class FeedState extends ChangeNotifier {
   // constructor here - you could pass a user id to the constructor and use it to trigger all methods with that user id
   FeedState() : _nostrService = NostrService(dotenv.get('RELAY_URL'));
 
-
   void init() {
     if (!isConnected) {
       _nostrService.connect((isConnected) async {
@@ -22,7 +22,6 @@ class FeedState extends ChangeNotifier {
           _lastLoadedAt = DateTime.now();
           await startListening();
           loadPosts();
-
         }
 
         this.isConnected = isConnected;
@@ -49,6 +48,7 @@ class FeedState extends ChangeNotifier {
 
   // state variables here - things that are observable by the UI
   final List<Post> posts = [];
+  final List<Post> contributions = [];
   bool isLoading = false;
   bool isLoadingMore = false;
   bool isConnected = false;
@@ -56,7 +56,6 @@ class FeedState extends ChangeNotifier {
   StreamSubscription<NostrEventModel>? _messageSubscription;
 
   DateTime? _lastLoadedAt;
-
 
   TxRequest? parseTxRequest(List<List<String>> tags) {
     try {
@@ -90,9 +89,50 @@ class FeedState extends ChangeNotifier {
 
               if (existingPostIndex == -1) {
                 // Add new posts to the beginning of the list
-                posts.insert(
-                  0,
-                  Post(
+                if (event.tags.any((tag) => tag[0] == 'e')) {
+                  contributions.insert(
+                    0,
+                    Post(
+                      id: event.id,
+                      replyId: event.tags.firstWhere((tag) => tag[0] == 'e')[1],
+                      userName: event.pubkey,
+                      userId: event.pubkey,
+                      content: event.content,
+                      txRequest: parseTxRequest(event.tags),
+                      createdAt: event.createdAt,
+                      updatedAt: event.createdAt,
+                    ),
+                  );
+                } else {
+                  posts.insert(
+                    0,
+                    Post(
+                      id: event.id,
+                      userName: event.pubkey,
+                      userId: event.pubkey,
+                      content: event.content,
+                      txRequest: parseTxRequest(event.tags),
+                      createdAt: event.createdAt,
+                      updatedAt: event.createdAt,
+                    ),
+                  );
+                }
+                safeNotifyListeners();
+              } else {
+                if (event.tags.any((tag) => tag[0] == 'e')) {
+                  contributions[existingPostIndex] = Post(
+                    id: event.id,
+                    replyId: event.tags.firstWhere((tag) => tag[0] == 'e')[1],
+                    userName: event.pubkey,
+                    userId: event.pubkey,
+                    content: event.content,
+                    txRequest: parseTxRequest(event.tags),
+                    createdAt: event.createdAt,
+                    updatedAt: event.createdAt,
+                  );
+                  safeNotifyListeners();
+                } else {
+                  posts[existingPostIndex] = Post(
                     id: event.id,
                     userName: event.pubkey,
                     userId: event.pubkey,
@@ -100,20 +140,9 @@ class FeedState extends ChangeNotifier {
                     txRequest: parseTxRequest(event.tags),
                     createdAt: event.createdAt,
                     updatedAt: event.createdAt,
-                  ),
-                );
-                safeNotifyListeners();
-              } else {
-                posts[existingPostIndex] = Post(
-                  id: event.id,
-                  userName: event.pubkey,
-                  userId: event.pubkey,
-                  content: event.content,
-                  txRequest: parseTxRequest(event.tags),
-                  createdAt: event.createdAt,
-                  updatedAt: event.createdAt,
-                );
-                safeNotifyListeners();
+                  );
+                  safeNotifyListeners();
+                }
               }
             },
             onError: (error) {
@@ -140,8 +169,24 @@ class FeedState extends ChangeNotifier {
         limit: limit,
         until: _lastLoadedAt,
       );
+      final historicalContributions = historicalEvents
+          .where((event) => event.tags.any((tag) => tag[0] == 'e'))
+          .map(
+            (event) => Post(
+              id: event.id,
+              replyId: event.tags.firstWhere((tag) => tag[0] == 'e')[1],
+              userName: event.pubkey,
+              userId: event.pubkey,
+              content: event.content,
+              txRequest: parseTxRequest(event.tags),
+              createdAt: event.createdAt,
+              updatedAt: event.createdAt,
+            ),
+          )
+          .toList();
 
       final historicalPosts = historicalEvents
+          .where((event) => !event.tags.any((tag) => tag[0] == 'e'))
           .map(
             (event) => Post(
               id: event.id,
@@ -157,12 +202,13 @@ class FeedState extends ChangeNotifier {
 
       posts.clear();
       upsertPosts(historicalPosts);
+      upsertPosts(historicalContributions);
 
       // Add some mock posts with transactions for testing
       _addMockPostsWithTransactions();
 
       // If we got less than 20 posts, we've reached the end
-      if (historicalPosts.length < limit) {
+      if (historicalPosts.length + historicalContributions.length < limit) {
         hasMorePosts = false;
       }
 
@@ -202,7 +248,24 @@ class FeedState extends ChangeNotifier {
         until: _lastLoadedAt,
       );
 
+      final historicalContributions = historicalEvents
+          .where((event) => event.tags.any((tag) => tag[0] == 'e'))
+          .map(
+            (event) => Post(
+              id: event.id,
+              replyId: event.tags.firstWhere((tag) => tag[0] == 'e')[1],
+              userName: event.pubkey,
+              userId: event.pubkey,
+              content: event.content,
+              txRequest: parseTxRequest(event.tags),
+              createdAt: event.createdAt,
+              updatedAt: event.createdAt,
+            ),
+          )
+          .toList();
+
       final historicalPosts = historicalEvents
+          .where((event) => !event.tags.any((tag) => tag[0] == 'e'))
           .map(
             (event) => Post(
               id: event.id,
@@ -217,12 +280,13 @@ class FeedState extends ChangeNotifier {
           .toList();
 
       upsertPosts(historicalPosts);
+      upsertPosts(historicalContributions);
 
       // Add some mock posts with transactions for testing
       _addMockPostsWithTransactions();
 
       // If we got less than limit posts, we've reached the end
-      if (historicalPosts.length < limit) {
+      if (historicalPosts.length + historicalContributions.length < limit) {
         hasMorePosts = false;
       }
 
@@ -262,8 +326,24 @@ class FeedState extends ChangeNotifier {
         until: until,
       );
 
+      final moreContributions = moreEvents
+          .where((event) => event.tags.any((tag) => tag[0] == 'e'))
+          .map(
+            (event) => Post(
+              id: event.id,
+              replyId: event.tags.firstWhere((tag) => tag[0] == 'e')[1],
+              userName: event.pubkey,
+              userId: event.pubkey,
+              content: event.content,
+              txRequest: parseTxRequest(event.tags),
+              createdAt: event.createdAt,
+              updatedAt: event.createdAt,
+            ),
+          )
+          .toList();
       if (moreEvents.isNotEmpty) {
         final morePosts = moreEvents
+            .where((event) => !event.tags.any((tag) => tag[0] == 'e'))
             .map(
               (event) => Post(
                 id: event.id,
@@ -276,20 +356,15 @@ class FeedState extends ChangeNotifier {
               ),
             )
             .toList();
-
         upsertPosts(morePosts);
-
-        // If we got less than limit posts, we've reached the end
-        if (morePosts.length < limit) {
-          hasMorePosts = false;
-        }
-      } else {
-        hasMorePosts = false;
+        upsertPosts(moreContributions);
       }
 
       safeNotifyListeners();
     } catch (e) {
       debugPrint('Error loading more posts: $e');
+      safeNotifyListeners();
+      rethrow;
     }
 
     isLoadingMore = false;
@@ -326,40 +401,100 @@ class FeedState extends ChangeNotifier {
     double amount, {
     TransactionType type = TransactionType.request,
   }) async {
-    isLoading = true;
-    safeNotifyListeners();
+    try {
+      isLoading = true;
+      safeNotifyListeners();
 
-    final txRequest = TxRequest(
-      username: username,
-      address: address,
-      amount: amount,
-      type: type,
-    );
+      final txRequest = TxRequest(
+        username: username,
+        address: address,
+        amount: amount,
+        type: type,
+      );
 
-    debugPrint('txRequest: ${jsonEncode(txRequest.toJson())}');
+      debugPrint('txRequest: ${jsonEncode(txRequest.toJson())}');
 
-    List<List<String>> tags = [
-      ['tx-request', jsonEncode(txRequest.toJson())],
-    ];
+      List<List<String>> tags = [
+        ['tx-request', jsonEncode(txRequest.toJson())],
+      ];
 
-    final event = await _nostrService.publishEvent(
-      NostrEventModel.fromPartialData(kind: 1, content: content, tags: tags),
-    );
+      final event = await _nostrService.publishEvent(
+        NostrEventModel.fromPartialData(kind: 1, content: content, tags: tags),
+      );
 
-    final post = Post(
-      id: event.id,
-      userName: event.pubkey,
-      userId: event.pubkey,
-      content: event.content,
-      txRequest: txRequest,
-      createdAt: event.createdAt,
-      updatedAt: event.createdAt,
-    );
+      final post = Post(
+        id: event.id,
+        userName: event.pubkey,
+        userId: event.pubkey,
+        content: event.content,
+        txRequest: txRequest,
+        createdAt: event.createdAt,
+        updatedAt: event.createdAt,
+      );
 
-    posts.insert(0, post);
+      posts.insert(0, post);
 
-    isLoading = false;
-    safeNotifyListeners();
+      isLoading = false;
+      safeNotifyListeners();
+    } catch (e, s) {
+      debugPrint('Error creating request: $e');
+      debugPrint('Error creating request: $s');
+      isLoading = false;
+      safeNotifyListeners();
+    }
+  }
+
+  Future<void> contributeToCrowdfund(
+    String id,
+    String content,
+    String address,
+    double amount,
+    UserOp userop,
+  ) async {
+    try {
+      isLoading = true;
+      safeNotifyListeners();
+
+      debugPrint('userOpRequest: ${jsonEncode(userop.toJson())}');
+
+      final txRequest = TxRequest(
+        username: 'hello',
+        address: address,
+        amount: amount,
+        type: TransactionType.send,
+      );
+
+      List<List<String>> tags = [
+        ['e', id],
+        ['tx-request', jsonEncode(txRequest.toJson())],
+        ['tx-intent', jsonEncode(userop.toJson())],
+      ];
+
+      final event = await _nostrService.publishEvent(
+        NostrEventModel.fromPartialData(kind: 1, content: content, tags: tags),
+      );
+
+      final contribution = Post(
+        id: event.id,
+        replyId: id,
+        userName: event.pubkey,
+        userId: event.pubkey,
+        content: event.content,
+        txRequest: txRequest,
+        createdAt: event.createdAt,
+        updatedAt: event.createdAt,
+      );
+
+      contributions.insert(0, contribution);
+
+      isLoading = false;
+      safeNotifyListeners();
+    } catch (e, s) {
+      debugPrint('Error creating request: $e');
+      debugPrint('Error creating request: $s');
+      isLoading = false;
+      safeNotifyListeners();
+    }
   }
 
   void upsertPosts(List<Post> posts) {
@@ -375,8 +510,6 @@ class FeedState extends ChangeNotifier {
     // Sort posts by creation date (most recent first)
     this.posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
-
-
 
   /// Reconnect with new settings
   Future<void> reconnect() async {
@@ -444,14 +577,16 @@ class FeedState extends ChangeNotifier {
       id: 'mock-targeted-receive-post-1',
       userName: '0x1234567890abcdef1234567890abcdef12345678',
       userId: '0x1234567890abcdef1234567890abcdef12345678',
-      content: 'Hey! Could you help me out with some PYUSD? I need to cover some expenses.',
+      content:
+          'Hey! Could you help me out with some PYUSD? I need to cover some expenses.',
       userInitials: 'AC',
       likeCount: 2,
       dislikeCount: 0,
       commentCount: 1,
       txRequest: TxRequest(
         username: '0x1234567890abcdef1234567890abcdef12345678',
-        address: '0x1234567890abcdef1234567890abcdef12345678', // Alice's address (from)
+        address:
+            '0x1234567890abcdef1234567890abcdef12345678', // Alice's address (from)
         amount: 50.0,
         type: TransactionType.request,
         status: 'Request Pending',
@@ -508,7 +643,8 @@ class FeedState extends ChangeNotifier {
       id: 'mock-crowdfund-success-1',
       userName: '0xfedcba0987654321fedcba0987654321fedcba09',
       userId: '0xfedcba0987654321fedcba0987654321fedcba09',
-      content: 'Thank you everyone! We reached our goal for the art exhibition! 🎨',
+      content:
+          'Thank you everyone! We reached our goal for the art exhibition! 🎨',
       userInitials: 'MC',
       likeCount: 25,
       dislikeCount: 0,
@@ -527,21 +663,15 @@ class FeedState extends ChangeNotifier {
 
     // Insert mock posts at the beginning
     posts.insertAll(0, [
-      mockTargetedReceivePost, 
-      mockSendPost, 
-      mockCrowdfundProgressPost, 
-      mockCrowdfundSuccessPost
+      mockTargetedReceivePost,
+      mockSendPost,
+      mockCrowdfundProgressPost,
+      mockCrowdfundSuccessPost,
     ]);
   }
-
-
 }
 
-enum TransactionType {
-  send,
-  request,
-  crowdfund,
-}
+enum TransactionType { send, request, crowdfund }
 
 class TxRequest {
   String username;

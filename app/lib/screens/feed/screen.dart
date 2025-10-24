@@ -74,8 +74,6 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
   }
 
   Future<void> handleCreatePost() async {
-    // modals and navigation in general can be awaited and return a value
-    // when inside SimpleNewPostScreen and navigator.pop(value) is called, value is returned
     final config = context.read<WalletState>().config;
 
     final content = await showCupertinoModalPopup<String?>(
@@ -91,6 +89,7 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
           SimpleNewPostScreen(
             onSendBack: handleSendBack,
             onRequest: handleRequest,
+            onCrowdfund: handleCrowdfund,
           ),
         ),
       ),
@@ -101,11 +100,6 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
     }
 
     await _feedState.createPost(content);
-  }
-
-
-  void handleDesignSystem() {
-    // TODO: Implement design system navigation
   }
 
   void handleSendBack() async {
@@ -125,7 +119,39 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
     await _walletState.send(id, to, amount);
   }
 
-  Future<void> handleContribute(String username, String address, double amount) async {
+  void handleContributeOnCrowdfund(
+    String id,
+    String content,
+    String to,
+    double amount,
+  ) async {
+    final userop = await _walletState.signUserOp(id, to, amount);
+    if (userop == null) {
+      return;
+    }
+    await _feedState.contributeToCrowdfund(id, content, to, amount, userop);
+  }
+
+  void handleCrowdfund(
+    String content,
+    String username,
+    String address,
+    double amount,
+  ) async {
+    await _feedState.createRequest(
+      content,
+      username,
+      address,
+      amount,
+      type: TransactionType.crowdfund,
+    );
+  }
+
+  Future<void> handleContribute(
+    String id,
+    String username,
+    String address,
+  ) async {
     final config = context.read<WalletState>().config;
 
     await showCupertinoModalPopup<String?>(
@@ -141,13 +167,11 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
           SimpleNewPostScreen(
             onSendBack: handleSendBack,
             onRequest: handleRequest,
-            onContribute: (content, username, address, amount) async {
-              // Handle contribute logic here
-              print('Contribute: $content to $username ($address) amount: $amount');
+            onContribute: (content, username, address, amount) {
+              handleContributeOnCrowdfund(id, content, address, amount);
             },
             contributeToUsername: username,
             contributeToAddress: address,
-            contributeAmount: amount,
           ),
         ),
       ),
@@ -159,14 +183,9 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
     final feedState = context.watch<FeedState>();
     final posts = feedState.posts;
     final isLoadingMore = feedState.isLoadingMore;
-
-    // final profile = context.watch<WalletState>().profile;
-
     final balance = context.watch<WalletState>().balance;
-
-    Map<String, String> sendingRequests = context
-        .watch<WalletState>()
-        .sendingRequests;
+    final sendingRequests = context.watch<WalletState>().sendingRequests;
+    final contributions = feedState.contributions;
 
     return Scaffold(
       body: SafeArea(
@@ -181,15 +200,17 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
                 scrollBehavior: const CupertinoScrollBehavior(),
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
-                  CupertinoSliverRefreshControl(
-                    onRefresh: handleRefresh,
-                  ), // the Future returned by the function is what makes the spinner go away
+                  CupertinoSliverRefreshControl(onRefresh: handleRefresh),
                   SliverToBoxAdapter(
                     child: FlyBox(
                       children: [
                         // Build all post cards
                         ...posts.map(
-                          (post) => _buildPostCard(post, sendingRequests),
+                          (post) => _buildPostCard(
+                            post,
+                            contributions,
+                            sendingRequests,
+                          ),
                         ),
                         // Show loading indicator at the bottom if loading more
                         if (isLoadingMore) _buildLoadingIndicator(),
@@ -200,27 +221,45 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
                   if (posts.isEmpty)
                     SliverFillRemaining(
                       child: FlyBox(
-                        child: FlyText('No posts found').text('sm').color('gray500'),
+                        child: FlyText(
+                          'No posts found',
+                        ).text('sm').color('gray500'),
                       ).justify('center').items('center'),
                     ),
                 ],
               ),
             ),
             // Fixed footer with balance and add button
-            BottomBar(
-              balance: balance,
-              onCreatePost: handleCreatePost,
-            ),
+            BottomBar(balance: balance, onCreatePost: handleCreatePost),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPostCard(Post post, Map<String, String> sendingRequests) {
+  Widget _buildPostCard(
+    Post post,
+    List<Post> contributions,
+    Map<String, String> sendingRequests,
+  ) {
+    final relatedContributions = contributions.where(
+      (contribution) =>
+          contribution.replyId != null && contribution.replyId == post.id,
+    );
+    final totalAmount = relatedContributions.fold(
+      0.0,
+      (sum, contribution) => sum + contribution.txRequest!.amount,
+    );
+    final totalAmountString = totalAmount.toStringAsFixed(2);
+
+    bool wasCrowdfundSuccessful = false;
+    if (post.txRequest?.type == TransactionType.crowdfund) {
+      wasCrowdfundSuccessful = totalAmount >= post.txRequest!.amount;
+    }
+
     return PostCard(
       key: Key(post.id),
-      userAddress: post.userId, // Using userId as the user's public key/address
+      userAddress: post.userId,
       userName: post.userName,
       content: post.content,
       userInitials: post.userInitials,
@@ -235,12 +274,8 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
               timeAgo: '1 hour ago',
               recipientInitials: post.userInitials,
               status: post.txRequest!.status ?? 'Send Complete',
-              onBackTap: () {
-                // Handle back navigation
-              },
-              onDeleteTap: () {
-                // Handle delete action
-              },
+              onBackTap: () {},
+              onDeleteTap: () {},
             )
           : null,
       requestTransaction: post.txRequest?.type == TransactionType.request
@@ -252,13 +287,12 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
               amount: post.txRequest!.amount.toString(),
               timeAgo: '1 hour ago',
               senderInitials: post.userInitials,
-              status: sendingRequests[post.id] ?? post.txRequest!.status ?? 'Request Pending',
-              onBackTap: () {
-                // Handle back navigation
-              },
-              onDeleteTap: () {
-                // Handle delete action
-              },
+              status:
+                  sendingRequests[post.id] ??
+                  post.txRequest!.status ??
+                  'Request Pending',
+              onBackTap: () {},
+              onDeleteTap: () {},
               onFulfillRequest: () {
                 handleSend(
                   post.id,
@@ -275,39 +309,30 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
               goalAmount: post.txRequest!.amount.toString(),
               timeAgo: '1 hour ago',
               recipientInitials: post.userInitials,
-              currentAmount: post.txRequest!.currentAmount?.toString() ?? '0',
-              status: post.txRequest!.status ?? 'Crowdfund In Progress',
-              onBackTap: () {
-                // Handle back navigation
-              },
-              onDeleteTap: () {
-                // Handle delete action
-              },
+              currentAmount: totalAmountString,
+              status: wasCrowdfundSuccessful
+                  ? 'Crowdfund Successful'
+                  : post.txRequest!.status ?? 'Crowdfund In Progress',
+              onBackTap: () {},
+              onDeleteTap: () {},
               onContribute: () {
-                handleContribute(post.txRequest!.username, post.txRequest!.address, post.txRequest!.amount);
+                handleContribute(
+                  post.id,
+                  post.txRequest!.username,
+                  post.txRequest!.address,
+                );
               },
-              onClaim: () {
-                print('Claim crowdfund');
-              },
+              onClaim: () {},
             )
           : null,
       createdAt: post.createdAt,
-      onLike: () {
-        // TODO: Implement like functionality
-      },
-      onDislike: () {
-        // TODO: Implement dislike functionality
-      },
+      onLike: () {},
+      onDislike: () {},
       onComment: () {
-        // Navigate to post details page
         context.push('/user123/posts/${post.id}');
       },
-      onShare: () {
-        // TODO: Implement share functionality
-      },
-      onMore: () {
-        // TODO: Implement more options functionality
-      },
+      onShare: () {},
+      onMore: () {},
     );
   }
 

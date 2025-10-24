@@ -9,8 +9,8 @@
       "type": "go",
       "request": "launch",
       "mode": "auto",
-      "program": "${workspaceFolder}/cmd/main.go",
-      "args": ["-env", "../.env"]
+      "program": "${workspaceFolder}/relay/cmd/main.go",
+      "args": ["-env", "${workspaceFolder}/relay/.env"]
     }
   ]
 }

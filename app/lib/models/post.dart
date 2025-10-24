@@ -8,6 +8,7 @@ part 'post.g.dart';
 @JsonSerializable()
 class Post {
   final String id;
+  final String? replyId;
   final String userName;
   final String userId;
   final String content;
@@ -23,6 +24,7 @@ class Post {
 
   const Post({
     required this.id,
+    this.replyId,
     required this.userName,
     required this.userId,
     required this.content,
@@ -43,6 +45,7 @@ class Post {
 
   Post copyWith({
     String? id,
+    String? replyId,
     String? userName,
     String? userId,
     String? content,
@@ -58,6 +61,7 @@ class Post {
   }) {
     return Post(
       id: id ?? this.id,
+      replyId: replyId ?? this.replyId,
       userName: userName ?? this.userName,
       userId: userId ?? this.userId,
       content: content ?? this.content,
@@ -78,6 +82,7 @@ class Post {
     if (identical(this, other)) return true;
     return other is Post &&
         other.id == id &&
+        other.replyId == replyId &&
         other.userName == userName &&
         other.userId == userId &&
         other.content == content &&
@@ -96,6 +101,7 @@ class Post {
   int get hashCode {
     return Object.hash(
       id,
+      replyId,
       userName,
       userId,
       content,
@@ -113,6 +119,6 @@ class Post {
 
   @override
   String toString() {
-    return 'Post(id: $id, userName: $userName, userId: $userId, content: $content, userAvatarUrl: $userAvatarUrl, userInitials: $userInitials, likeCount: $likeCount, dislikeCount: $dislikeCount, commentCount: $commentCount, transaction: $transaction, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'Post(id: $id, replyId: $replyId, userName: $userName, userId: $userId, content: $content, userAvatarUrl: $userAvatarUrl, userInitials: $userInitials, likeCount: $likeCount, dislikeCount: $dislikeCount, commentCount: $commentCount, transaction: $transaction, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 }
