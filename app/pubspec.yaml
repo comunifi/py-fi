@@ -13,6 +13,20 @@ dependencies:
     path: ../../flywind
   lucide_icons: ^0.257.0
   blockies: ^0.1.2
+  http: ^1.5.0
+  toastification: ^3.0.3
+  web3dart: ^2.7.3
+  dart_nostr:
+    path: ../../dart_nostr
+  universal_io: ^2.2.2
+  file_picker: ^10.3.3
+  image: ^4.5.4
+  shared_preferences: ^2.5.3
+  flutter_dotenv: ^6.0.0
+  smartcontracts:
+    git:
+      url: https://github.com/citizenwallet/smartcontracts.git
+      ref: v0.0.106
 
 dev_dependencies:
   flutter_test:
