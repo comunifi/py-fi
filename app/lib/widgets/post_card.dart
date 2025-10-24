@@ -6,7 +6,9 @@ import '../design/avatar.dart';
 import '../design/avatar_blockies.dart';
 import '../design/card.dart';
 import '../utils/address.dart';
-import 'transaction_card.dart';
+import 'send_card.dart';
+import 'request_card.dart';
+import 'crowdfund_card.dart';
 
 class PostCard extends FlyCard {
   PostCard({
@@ -33,7 +35,9 @@ class PostCard extends FlyCard {
     this.likeCount = 0,
     this.dislikeCount = 0,
     this.commentCount = 0,
-    this.transaction,
+    this.sendTransaction,
+    this.requestTransaction,
+    this.crowdfundTransaction,
     this.createdAt,
     this.onLike,
     this.onDislike,
@@ -51,7 +55,9 @@ class PostCard extends FlyCard {
   final int likeCount;
   final int dislikeCount;
   final int commentCount;
-  final TransactionCard? transaction;
+  final SendTransactionCard? sendTransaction;
+  final RequestTransactionCard? requestTransaction;
+  final CrowdfundTransactionCard? crowdfundTransaction;
   final DateTime? createdAt;
   final VoidCallback? onLike;
   final VoidCallback? onDislike;
@@ -85,7 +91,9 @@ class PostCard extends FlyCard {
         _buildContent(),
 
         // Transaction (optional)
-        if (transaction != null) FlyBox(children: [transaction!]).mt('s3'),
+        if (sendTransaction != null) FlyBox(children: [sendTransaction!]).mt('s3'),
+        if (requestTransaction != null) FlyBox(children: [requestTransaction!]).mt('s3'),
+        if (crowdfundTransaction != null) FlyBox(children: [crowdfundTransaction!]).mt('s3'),
       ],
     );
   }
@@ -122,15 +130,6 @@ class PostCard extends FlyCard {
 
   Widget _buildContent() {
     return FlyText(content).text('sm').color('gray700').leading('relaxed');
-  }
-
-  Widget _buildTxRequest() {
-    return FlyBox(
-      children: [
-        FlyText(txRequest!.address).text('sm').color('gray700'),
-        FlyText(txRequest!.amount.toString()).text('sm').color('gray700'),
-      ],
-    ).row().items('center').gap('s3').mb('s2');
   }
 
   String _formatTimestamp(DateTime timestamp) {
@@ -172,7 +171,9 @@ class PostCard extends FlyCard {
       likeCount: likeCount,
       dislikeCount: dislikeCount,
       commentCount: commentCount,
-      transaction: transaction,
+      sendTransaction: sendTransaction,
+      requestTransaction: requestTransaction,
+      crowdfundTransaction: crowdfundTransaction,
       createdAt: createdAt,
       onLike: onLike,
       onDislike: onDislike,

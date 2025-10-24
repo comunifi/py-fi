@@ -292,8 +292,8 @@ class FlyCardWithHeader extends FlyBox {
         .row()
         .items('center')
         .justify('between')
-        .px('s3')
-        .py('s2')
+        .px('s4')
+        .py('s3')
         .bg(headerBackgroundColor)
         .rounded('lg'),
 

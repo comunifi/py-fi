@@ -159,7 +159,7 @@ class FeedState extends ChangeNotifier {
       upsertPosts(historicalPosts);
 
       // Add some mock posts with transactions for testing
-      // _addMockPostsWithTransactions();
+      _addMockPostsWithTransactions();
 
       // If we got less than 20 posts, we've reached the end
       if (historicalPosts.length < limit) {
@@ -219,7 +219,7 @@ class FeedState extends ChangeNotifier {
       upsertPosts(historicalPosts);
 
       // Add some mock posts with transactions for testing
-      // _addMockPostsWithTransactions();
+      _addMockPostsWithTransactions();
 
       // If we got less than limit posts, we've reached the end
       if (historicalPosts.length < limit) {
@@ -323,8 +323,9 @@ class FeedState extends ChangeNotifier {
     String content,
     String username,
     String address,
-    double amount,
-  ) async {
+    double amount, {
+    TransactionType type = TransactionType.request,
+  }) async {
     isLoading = true;
     safeNotifyListeners();
 
@@ -332,6 +333,7 @@ class FeedState extends ChangeNotifier {
       username: username,
       address: address,
       amount: amount,
+      type: type,
     );
 
     debugPrint('txRequest: ${jsonEncode(txRequest.toJson())}');
@@ -436,17 +438,126 @@ class FeedState extends ChangeNotifier {
     }
   }
 
+  void _addMockPostsWithTransactions() {
+    // Add a mock targeted receive post (targeted to current user - they will see fulfill button)
+    final mockTargetedReceivePost = Post(
+      id: 'mock-targeted-receive-post-1',
+      userName: '0x1234567890abcdef1234567890abcdef12345678',
+      userId: '0x1234567890abcdef1234567890abcdef12345678',
+      content: 'Hey! Could you help me out with some PYUSD? I need to cover some expenses.',
+      userInitials: 'AC',
+      likeCount: 2,
+      dislikeCount: 0,
+      commentCount: 1,
+      txRequest: TxRequest(
+        username: '0x1234567890abcdef1234567890abcdef12345678',
+        address: '0x1234567890abcdef1234567890abcdef12345678', // Alice's address (from)
+        amount: 50.0,
+        type: TransactionType.request,
+        status: 'Request Pending',
+      ),
+      createdAt: DateTime.now().subtract(const Duration(hours: 2)),
+      updatedAt: DateTime.now().subtract(const Duration(hours: 2)),
+    );
+
+    // Add a mock send post (completed transaction - no fulfill button)
+    final mockSendPost = Post(
+      id: 'mock-send-post-1',
+      userName: '0x9876543210fedcba9876543210fedcba98765432',
+      userId: '0x9876543210fedcba9876543210fedcba98765432',
+      content: 'Sending some PYUSD to my friend for lunch! 🍕',
+      userInitials: 'BT',
+      likeCount: 5,
+      dislikeCount: 0,
+      commentCount: 3,
+      txRequest: TxRequest(
+        username: '0x9876543210fedcba9876543210fedcba98765432',
+        address: '0x9876543210fedcba9876543210fedcba98765432',
+        amount: 25.0,
+        type: TransactionType.send,
+        status: 'Send Complete',
+      ),
+      createdAt: DateTime.now().subtract(const Duration(hours: 1)),
+      updatedAt: DateTime.now().subtract(const Duration(hours: 1)),
+    );
+
+    // Add a mock crowdfund in progress post
+    final mockCrowdfundProgressPost = Post(
+      id: 'mock-crowdfund-progress-1',
+      userName: '0xabcdef1234567890abcdef1234567890abcdef12',
+      userId: '0xabcdef1234567890abcdef1234567890abcdef12',
+      content: 'Help me reach my goal for the community garden project! 🌱',
+      userInitials: 'SF',
+      likeCount: 12,
+      dislikeCount: 0,
+      commentCount: 8,
+      txRequest: TxRequest(
+        username: '0xabcdef1234567890abcdef1234567890abcdef12',
+        address: '0xabcdef1234567890abcdef1234567890abcdef12',
+        amount: 2.0, // Goal amount
+        type: TransactionType.crowdfund,
+        status: 'Crowdfund In Progress',
+        currentAmount: 1.0, // Current progress
+      ),
+      createdAt: DateTime.now().subtract(const Duration(hours: 3)),
+      updatedAt: DateTime.now().subtract(const Duration(hours: 3)),
+    );
+
+    // Add a mock crowdfund successful post
+    final mockCrowdfundSuccessPost = Post(
+      id: 'mock-crowdfund-success-1',
+      userName: '0xfedcba0987654321fedcba0987654321fedcba09',
+      userId: '0xfedcba0987654321fedcba0987654321fedcba09',
+      content: 'Thank you everyone! We reached our goal for the art exhibition! 🎨',
+      userInitials: 'MC',
+      likeCount: 25,
+      dislikeCount: 0,
+      commentCount: 15,
+      txRequest: TxRequest(
+        username: '0xfedcba0987654321fedcba0987654321fedcba09',
+        address: '0xfedcba0987654321fedcba0987654321fedcba09',
+        amount: 5.0, // Goal amount
+        type: TransactionType.crowdfund,
+        status: 'Crowdfund Successful',
+        currentAmount: 5.0, // Fully funded
+      ),
+      createdAt: DateTime.now().subtract(const Duration(days: 1)),
+      updatedAt: DateTime.now().subtract(const Duration(days: 1)),
+    );
+
+    // Insert mock posts at the beginning
+    posts.insertAll(0, [
+      mockTargetedReceivePost, 
+      mockSendPost, 
+      mockCrowdfundProgressPost, 
+      mockCrowdfundSuccessPost
+    ]);
+  }
+
+
+}
+
+enum TransactionType {
+  send,
+  request,
+  crowdfund,
 }
 
 class TxRequest {
   String username;
   String address;
   double amount;
+  TransactionType type;
+  String? status; // For tracking transaction state
+  double? currentAmount; // For crowdfund progress
 
   TxRequest({
     required this.username,
     required this.address,
     required this.amount,
+    required this.type,
+    this.status,
+    this.currentAmount,
   });
 
   factory TxRequest.fromJson(Map<String, dynamic> json) {
@@ -454,10 +565,23 @@ class TxRequest {
       username: json['username'],
       address: json['address'],
       amount: json['amount'],
+      type: TransactionType.values.firstWhere(
+        (e) => e.name == json['type'],
+        orElse: () => TransactionType.request, // Default to request
+      ),
+      status: json['status'],
+      currentAmount: json['currentAmount'],
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {'username': username, 'address': address, 'amount': amount};
+    return {
+      'username': username,
+      'address': address,
+      'amount': amount,
+      'type': type.name,
+      'status': status,
+      'currentAmount': currentAmount,
+    };
   }
 }

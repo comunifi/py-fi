@@ -2,14 +2,16 @@ import 'dart:async';
 
 import 'package:app/design/button.dart';
 import 'package:app/models/post.dart';
-import 'package:app/screens/feed/new_post.dart';
+import 'package:app/widgets/new_post.dart';
 import 'package:app/state/feed.dart';
 import 'package:app/state/state.dart';
 import 'package:app/state/wallet.dart';
 import 'package:app/widgets/balance.dart';
 import 'package:app/widgets/topbar.dart';
 import 'package:app/widgets/post_card.dart';
-import 'package:app/widgets/transaction_card.dart';
+import 'package:app/widgets/send_card.dart';
+import 'package:app/widgets/request_card.dart';
+import 'package:app/widgets/crowdfund_card.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flywind/flywind.dart';
@@ -80,12 +82,18 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
 
     final content = await showCupertinoModalPopup<String?>(
       context: context,
-      builder: (context) => provideAccountState(
-        context,
-        config,
-        SimpleNewPostScreen(
-          onSendBack: handleSendBack,
-          onRequest: handleRequest,
+      builder: (context) => MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: _walletState),
+          ChangeNotifierProvider.value(value: _feedState),
+        ],
+        child: provideAccountState(
+          context,
+          config,
+          SimpleNewPostScreen(
+            onSendBack: handleSendBack,
+            onRequest: handleRequest,
+          ),
         ),
       ),
     );
@@ -117,6 +125,35 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
 
   void handleSend(String id, String to, double amount) async {
     await _walletState.send(id, to, amount);
+  }
+
+  Future<void> handleContribute(String username, String address, double amount) async {
+    final config = context.read<WalletState>().config;
+
+    await showCupertinoModalPopup<String?>(
+      context: context,
+      builder: (context) => MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: _walletState),
+          ChangeNotifierProvider.value(value: _feedState),
+        ],
+        child: provideAccountState(
+          context,
+          config,
+          SimpleNewPostScreen(
+            onSendBack: handleSendBack,
+            onRequest: handleRequest,
+            onContribute: (content, username, address, amount) async {
+              // Handle contribute logic here
+              print('Contribute: $content to $username ($address) amount: $amount');
+            },
+            contributeToUsername: username,
+            contributeToAddress: address,
+            contributeAmount: amount,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -204,23 +241,32 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
       likeCount: post.likeCount,
       dislikeCount: post.dislikeCount,
       commentCount: post.commentCount,
-      transaction: post.txRequest != null
-          ? TransactionCard(
-              senderName: post.txRequest!.username,
-              senderAddress: post
-                  .txRequest!
-                  .address, // Use the post author's address as sender address
+      sendTransaction: post.txRequest?.type == TransactionType.send
+          ? SendTransactionCard(
+              recipientName: post.txRequest!.username,
+              recipientAddress: post.txRequest!.address,
               amount: post.txRequest!.amount.toString(),
-              // timeAgo: post.transaction!.timeAgo,
-              // senderInitials: post.transaction!.senderInitials,
-              // status: post.transaction!.timeAgo == 'Pending'
-              //     ? 'Request Pending'
-              //     : post.transaction!.timeAgo == 'Complete'
-              //     ? 'Request Complete'
-              //     : 'Completed',
               timeAgo: '1 hour ago',
-              senderInitials: 'hello',
-              status: sendingRequests[post.id] ?? 'Request Pending',
+              recipientInitials: post.userInitials,
+              status: post.txRequest!.status ?? 'Send Complete',
+              onBackTap: () {
+                // Handle back navigation
+              },
+              onDeleteTap: () {
+                // Handle delete action
+              },
+            )
+          : null,
+      requestTransaction: post.txRequest?.type == TransactionType.request
+          ? RequestTransactionCard(
+              senderName: post.txRequest!.username,
+              senderAddress: post.txRequest!.address,
+              recipientName: post.txRequest!.username,
+              recipientAddress: post.txRequest!.address,
+              amount: post.txRequest!.amount.toString(),
+              timeAgo: '1 hour ago',
+              senderInitials: post.userInitials,
+              status: sendingRequests[post.id] ?? post.txRequest!.status ?? 'Request Pending',
               onBackTap: () {
                 // Handle back navigation
               },
@@ -233,6 +279,29 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
                   post.txRequest!.address,
                   post.txRequest!.amount,
                 );
+              },
+            )
+          : null,
+      crowdfundTransaction: post.txRequest?.type == TransactionType.crowdfund
+          ? CrowdfundTransactionCard(
+              recipientName: post.txRequest!.username,
+              recipientAddress: post.txRequest!.address,
+              goalAmount: post.txRequest!.amount.toString(),
+              timeAgo: '1 hour ago',
+              recipientInitials: post.userInitials,
+              currentAmount: post.txRequest!.currentAmount?.toString() ?? '0',
+              status: post.txRequest!.status ?? 'Crowdfund In Progress',
+              onBackTap: () {
+                // Handle back navigation
+              },
+              onDeleteTap: () {
+                // Handle delete action
+              },
+              onContribute: () {
+                handleContribute(post.txRequest!.username, post.txRequest!.address, post.txRequest!.amount);
+              },
+              onClaim: () {
+                print('Claim crowdfund');
               },
             )
           : null,
