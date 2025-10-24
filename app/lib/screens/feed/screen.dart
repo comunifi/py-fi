@@ -1,14 +1,13 @@
 import 'dart:async';
 
-import 'package:app/design/avatar.dart';
-import 'package:app/design/avatar_blockies.dart';
 import 'package:app/design/button.dart';
 import 'package:app/models/post.dart';
 import 'package:app/screens/feed/new_post.dart';
 import 'package:app/state/feed.dart';
 import 'package:app/state/state.dart';
 import 'package:app/state/wallet.dart';
-import 'package:app/utils/address.dart';
+import 'package:app/widgets/balance.dart';
+import 'package:app/widgets/topbar.dart';
 import 'package:app/widgets/post_card.dart';
 import 'package:app/widgets/transaction_card.dart';
 import 'package:flutter/cupertino.dart';
@@ -126,7 +125,7 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
     final posts = feedState.posts;
     final isLoadingMore = feedState.isLoadingMore;
 
-    final profile = context.watch<WalletState>().profile;
+    // final profile = context.watch<WalletState>().profile;
 
     final balance = context.watch<WalletState>().balance;
 
@@ -134,53 +133,12 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
         .watch<WalletState>()
         .sendingRequests;
 
-    return CupertinoPageScaffold(
-      navigationBar: CupertinoNavigationBar(
-        backgroundColor: CupertinoColors.systemBackground,
-        border: const Border(
-          bottom: BorderSide(color: CupertinoColors.separator, width: 0.5),
-        ),
-        leading: null,
-        middle: null,
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // User avatar
-            FlyText(
-              '@${profile?.username ?? ''}',
-            ).text('xs').color('gray600').mr('s1'),
-            FlyAvatar(
-              size: AvatarSize.sm,
-              shape: AvatarShape.circular,
-              child: profile == null
-                  ? FlyAvatarBlockies(
-                      address:
-                          '0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6', // Current user's address
-                      size: AvatarSize.sm,
-                      shape: AvatarShape.circular,
-                      fallbackText: AddressUtils.getAddressInitials(
-                        '0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6',
-                      ),
-                    )
-                  : Image.network(
-                      profile.image,
-                      errorBuilder: (_, __, ___) => FlyAvatarBlockies(
-                        address:
-                            '0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6', // Current user's address
-                        size: AvatarSize.sm,
-                        shape: AvatarShape.circular,
-                        fallbackText: AddressUtils.getAddressInitials(
-                          '0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6',
-                        ),
-                      ),
-                    ),
-            ),
-          ],
-        ),
-      ),
-      child: SafeArea(
+    return Scaffold(
+      body: SafeArea(
         child: Column(
           children: [
+            // Custom header
+            const TopBar(),
             // Scrollable content area
             Expanded(
               child: CustomScrollView(
@@ -206,38 +164,19 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
                   // Show "no posts posted" message if there are no posts at all
                   if (posts.isEmpty)
                     SliverFillRemaining(
-                      child: Center(
-                        child: Text(
-                          'No posts found',
-                          style: TextStyle(
-                            color: CupertinoColors.systemGrey,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
+                      child: FlyBox(
+                        child: FlyText('No posts found').text('sm').color('gray500'),
+                      ).justify('center').items('center'),
                     ),
                 ],
               ),
             ),
             // Fixed footer with balance and add button
-            Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                border: Border(
-                  top: BorderSide(color: CupertinoColors.separator, width: 0.5),
-                ),
-              ),
+            FlyBox(
               child: FlyBox(
                 children: [
                   // Balance card
-                  FlyBox(
-                    children: [
-                      FlyText('balance').text('xs').color('gray600'),
-                      FlyText(
-                        '${balance ?? '0.00'} EURe',
-                      ).text('lg').weight('bold').color('gray900'),
-                    ],
-                  ).col().gap('s1').px('s3').py('s2').bg('white').rounded('lg'),
+                  Balance(balance: balance),
 
                   // Add button
                   FlyButton(
@@ -248,7 +187,7 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
                   ),
                 ],
               ).row().items('center').justify('between').px('s4').py('s3'),
-            ),
+            ).bg('white').borderT(1).borderColor('gray200'),
           ],
         ),
       ),
@@ -318,9 +257,8 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
   }
 
   Widget _buildLoadingIndicator() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: const Center(child: CupertinoActivityIndicator()),
-    );
+    return FlyBox(
+      child: CupertinoActivityIndicator(),
+    ).p('s4').justify('center').items('center');
   }
 }
