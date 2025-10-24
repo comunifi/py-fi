@@ -1,10 +1,10 @@
-// import 'package:app/screens/feed/screen.dart';
+import 'package:app/screens/feed/screen.dart';
 import 'package:app/state/state.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../design/examples.dart';
+// import '../design/examples.dart';
 Future<String?> redirectHandler(
   BuildContext context,
   GoRouterState state,
@@ -61,7 +61,8 @@ GoRouter createRouter(
           name: 'Posts',
           path: '/:userId/posts',
           builder: (context, state) {
-            return const DesignSystemScreen();
+            // return const DesignSystemScreen();
+            return const SocialFeedScreen();
           },
         ),
       ],

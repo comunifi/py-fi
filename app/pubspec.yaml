@@ -23,11 +23,19 @@ dependencies:
   image: ^4.5.4
   shared_preferences: ^2.5.3
   flutter_dotenv: ^6.0.0
+  web_socket_channel: ^2.4.0
+  collection: ^1.18.0
   smartcontracts:
     git:
       url: https://github.com/citizenwallet/smartcontracts.git
       ref: v0.0.106
+  contractforge:
+    git:
+      url: https://github.com/citizenwallet/contractforge.git
+      ref: v0.0.19
   go_router: ^16.2.4
+  json_annotation: ^4.9.0
+  provider: ^6.1.5+1
 
 dev_dependencies:
   flutter_test:
@@ -36,3 +44,25 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - .env
+    - assets/config/
+    - assets/words/
+    - assets/icons/
+    - packages/smartcontracts/contracts/accounts/Account.abi.json
+    - packages/smartcontracts/contracts/accounts/AccountFactory.abi.json
+    - packages/smartcontracts/contracts/external/DERC20.abi.json
+    - packages/smartcontracts/contracts/accounts/Account.abi.json
+    - packages/smartcontracts/contracts/external/SimpleAccountFactory.abi.json
+    - packages/smartcontracts/contracts/accounts/TokenEntryPoint.abi.json
+    - packages/smartcontracts/contracts/standards/IAccessControlUpgradeable.abi.json
+    - packages/smartcontracts/contracts/apps/SimpleFaucet.abi.json
+    - packages/smartcontracts/contracts/standards/ERC20.abi.json
+    - packages/smartcontracts/contracts/standards/ERC1155.abi.json
+    - packages/smartcontracts/contracts/apps/Profile.abi.json
+    - packages/smartcontracts/contracts/external/CardFactory.abi.json
+    - packages/contractforge/abi/CardManagerModule.json
+    - packages/contractforge/abi/Safe.json
+    - packages/contractforge/abi/CommunityModule.json
+    - packages/contractforge/abi/TwoFAFactory.json
+    - packages/contractforge/abi/SessionManagerModule.json
