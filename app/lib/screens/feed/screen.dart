@@ -1,12 +1,11 @@
 import 'dart:async';
 
-import 'package:app/design/button.dart';
 import 'package:app/models/post.dart';
 import 'package:app/widgets/new_post.dart';
 import 'package:app/state/feed.dart';
 import 'package:app/state/state.dart';
 import 'package:app/state/wallet.dart';
-import 'package:app/widgets/balance.dart';
+import 'package:app/widgets/bottombar.dart';
 import 'package:app/widgets/topbar.dart';
 import 'package:app/widgets/post_card.dart';
 import 'package:app/widgets/send_card.dart';
@@ -16,7 +15,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flywind/flywind.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 class SocialFeedScreen extends StatefulWidget {
@@ -209,22 +207,10 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
               ),
             ),
             // Fixed footer with balance and add button
-            FlyBox(
-              child: FlyBox(
-                children: [
-                  // Balance card
-                  Balance(balance: balance),
-
-                  // Add button
-                  FlyButton(
-                    onTap: handleCreatePost,
-                    buttonColor: ButtonColor.primary,
-                    variant: ButtonVariant.solid,
-                    child: FlyIcon(LucideIcons.plus).color('white'),
-                  ),
-                ],
-              ).row().items('center').justify('between').px('s4').py('s3'),
-            ).bg('white').borderT(1).borderColor('gray200'),
+            BottomBar(
+              balance: balance,
+              onCreatePost: handleCreatePost,
+            ),
           ],
         ),
       ),
