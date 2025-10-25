@@ -16,8 +16,6 @@ Enter Comunifi's unique take on crowdfunding for your community. No escrow, smar
 
 We've built a very simple demo which allows posting messages, starting a crowdfund, allowing others to contribute and claiming the contributions. All this by combining nostr and stablecoins. Completely non-custodial and peer to peer.
 
-The Demo is a macOS application but could be run on Linux, Windows, iOS, Android or even Web if needed. 
-
 ### Blockchain Layer - Arbitrum + ERC4337 Account Abstraction
 
 Users sign user operations (ERC4337, which are essentially signed intents to transact) which, if executed, will execute a transfer of funds from the user's account. These are contributions.
@@ -43,6 +41,18 @@ We used PYUSD to enable a mix of on-chain and off-chain transactions. In our dem
 Stablecoins make a lot of sense as a resource that gets allocated which can then be used for payments.
 
 PayPal's PYUSD stablecoin allows a bridge between Web2 and Web3, where we can send payments across borders to be used locally for purchasing services.
+
+### App - Flutter
+
+The Demo is a macOS application but could be run on Linux, Windows, iOS, Android or even Web if needed. 
+
+We use Flutter for its out of the box support for multiple platforms. 
+
+### Relay - Nostr + Golang + Postgres
+
+The relay is a go application running against a postgres database.
+
+Nostr allows for multiple strategies when it comes to persistance. We chose postgres.
 
 ## Demo
 
