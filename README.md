@@ -14,7 +14,7 @@ Enter Comunifi's unique take on crowdfunding for your community. No escrow, smar
 
 ## Solution
 
-We've built a very simple demo which allows posting messages, starting a crowdfund, allowing others to contribute and claiming the contributions. All this by combining nostr and stablecoins. Completely non-custodial and peer to peer.
+We've built a very simple solution which allows posting messages, starting a crowdfund, allowing others to contribute and claiming the contributions. All this by combining nostr and stablecoins. Completely non-custodial and peer to peer.
 
 ### Blockchain Layer - Arbitrum + ERC4337 Account Abstraction
 
@@ -30,13 +30,13 @@ For messaging and gossiping around the user ops, we use Nostr. With your same et
 
 You can post a message with a goal of 10 PYUSD. Others can contribute directly to it by simply signing a user op and submitting it as a reply to the crowdfund post. 
 
-Using the user op, we are able to parse out the contribution amount from the metadata (and verify it against the actual call data). Combining this with checking the balance of the contributor allows us to soft validate that the contribution is indeed possible. It is also possible to verify the signature of the owner of the account, we did not implement this for the demo. Harder validation can be done on the user op if needed.
+Using the user op, we are able to parse out the contribution amount from the metadata (and verify it against the actual call data). Combining this with checking the balance of the contributor allows us to soft validate that the contribution is indeed possible. It is also possible to verify the signature of the owner of the account, we did not implement this yet. Harder validation can be done on the user op if needed.
 
 Claiming is easy as extracting all user ops from the replies and submitting them. The bundler will batch if possible.
 
 ### Real World Layer - PYUSD
 
-We used PYUSD to enable a mix of on-chain and off-chain transactions. In our demo, we imagined a scenario where multiple people send PYUSD in order for someone to purchase a domain name online using the PayPal checkout flow.
+We used PYUSD to enable a mix of on-chain and off-chain transactions. We imagined a scenario where multiple people send PYUSD in order for someone to purchase a domain name online using the PayPal checkout flow.
 
 Stablecoins make a lot of sense as a resource that gets allocated which can then be used for payments.
 
