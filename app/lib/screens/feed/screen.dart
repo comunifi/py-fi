@@ -336,7 +336,9 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
       wasCrowdfundSuccessful = totalAmount >= post.txRequest!.amount;
       isCurrentUserRecipient =
           currentUserAddress != null &&
-          post.txRequest!.address.toLowerCase() == currentUserAddress;
+          currentUserAddress == '0x46547cc4216beF639bA9744E7719684971d7911d' &&
+          post.txRequest!.address.toLowerCase() ==
+              '0x6306a2414CA7A0F1Deca4F954F881b597E54878B';
       isClaiming = _walletState.submittingUserOps;
       isClaimed = _feedState.claimedCrowdfunds.contains(post.id);
     }
