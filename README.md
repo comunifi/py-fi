@@ -94,4 +94,4 @@ Put the ip address you get from ngrok as RELAY_URL.
 
 [>>we added a txt record to the domain we bought<<](https://www.nslookup.io/domains/comunifi.xyz/dns-records/#cloudflare)
 
-look for `eth-global-online-2025`
+look for `eth-global-online-2025:tx-hash:0xd3a17e143ad9a716debd0b298e9f33a6d043522ea153dee21ecd673d1a43a0d3` >> proving that we could only have added this after our transaction for our submission.
