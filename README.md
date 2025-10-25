@@ -16,6 +16,8 @@ Enter Comunifi's unique take on crowdfunding for your community. No escrow, smar
 
 We've built a very simple demo which allows posting messages, starting a crowdfund, allowing others to contribute and claiming the contributions. All this by combining nostr and stablecoins. Completely non-custodial and peer to peer.
 
+The Demo is a macOS application but could be run on Linux, Windows, iOS, Android or even Web if needed. 
+
 ### Blockchain Layer - Arbitrum + ERC4337 Account Abstraction
 
 Users sign user operations (ERC4337, which are essentially signed intents to transact) which, if executed, will execute a transfer of funds from the user's account. These are contributions.
