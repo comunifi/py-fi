@@ -1,3 +1,4 @@
+import 'package:app/services/wallet/models/userop.dart';
 import 'package:app/state/feed.dart';
 import 'package:json_annotation/json_annotation.dart';
 
@@ -19,6 +20,7 @@ class Post {
   final int commentCount;
   final Transaction? transaction;
   final TxRequest? txRequest;
+  final UserOp? userOp;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -35,6 +37,7 @@ class Post {
     this.commentCount = 0,
     this.transaction,
     this.txRequest,
+    this.userOp,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -56,6 +59,7 @@ class Post {
     int? commentCount,
     Transaction? transaction,
     TxRequest? txRequest,
+    UserOp? userOp,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -72,6 +76,7 @@ class Post {
       commentCount: commentCount ?? this.commentCount,
       transaction: transaction ?? this.transaction,
       txRequest: txRequest ?? this.txRequest,
+      userOp: userOp ?? this.userOp,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -93,6 +98,7 @@ class Post {
         other.commentCount == commentCount &&
         other.transaction == transaction &&
         other.txRequest == txRequest &&
+        other.userOp == userOp &&
         other.createdAt == createdAt &&
         other.updatedAt == updatedAt;
   }
@@ -112,6 +118,7 @@ class Post {
       commentCount,
       transaction,
       txRequest,
+      userOp,
       createdAt,
       updatedAt,
     );

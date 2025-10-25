@@ -147,6 +147,27 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
     );
   }
 
+  Future<void> handleClaim(String postId) async {
+    final contributions = _feedState.contributions[postId] ?? [];
+
+    // Collect all UserOps from contributions
+    final userOps = contributions
+        .where((contribution) => contribution.userOp != null)
+        .map((contribution) => contribution.userOp!)
+        .toList();
+
+    if (userOps.isEmpty) {
+      debugPrint('No user ops to claim');
+      return;
+    }
+
+    debugPrint('Claiming ${userOps.length} contributions');
+    await _walletState.submitUserOps(userOps);
+
+    // Mark the crowdfund as claimed after successful submission
+    _feedState.markCrowdfundAsClaimed(postId);
+  }
+
   Future<void> handleContribute(
     String id,
     String username,
@@ -183,8 +204,10 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
     final feedState = context.watch<FeedState>();
     final posts = feedState.posts;
     final isLoadingMore = feedState.isLoadingMore;
-    final balance = context.watch<WalletState>().balance;
-    final sendingRequests = context.watch<WalletState>().sendingRequests;
+    final walletState = context.watch<WalletState>();
+    final balance = walletState.balance;
+    final sendingRequests = walletState.sendingRequests;
+    final currentUserAddress = walletState.account?.hexEip55.toLowerCase();
     final contributions = feedState.contributions;
 
     return Scaffold(
@@ -210,6 +233,7 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
                             post,
                             contributions,
                             sendingRequests,
+                            currentUserAddress,
                           ),
                         ),
                         // Show loading indicator at the bottom if loading more
@@ -231,21 +255,60 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
             ),
             // Fixed footer with balance and add button
             BottomBar(balance: balance, onCreatePost: handleCreatePost),
+            // Progress bar for submitting user ops
+            if (walletState.submittingUserOps) _buildProgressBar(walletState),
           ],
         ),
       ),
     );
   }
 
+  Widget _buildProgressBar(WalletState walletState) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFFFFFFFF),
+        border: Border(top: BorderSide(color: Color(0xFFE5E7EB), width: 1)),
+      ),
+      child: FlyBox(
+        children: [
+          FlyBox(
+            children: [
+              FlyText(
+                'Claiming contributions ${walletState.submittingUserOpsCompleted}/${walletState.submittingUserOpsTotal}',
+              ).text('xs').color('gray700'),
+            ],
+          ).row().items('center').justify('between').mb('s2'),
+          FlyBox(
+            child: Container(
+              height: 4,
+              decoration: BoxDecoration(
+                color: CupertinoColors.systemGrey5,
+                borderRadius: BorderRadius.circular(2),
+              ),
+              child: FractionallySizedBox(
+                alignment: Alignment.centerLeft,
+                widthFactor: walletState.submittingUserOpsProgress,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.systemBlue,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ).col().px('s4').py('s3'),
+    );
+  }
+
   Widget _buildPostCard(
     Post post,
-    List<Post> contributions,
+    Map<String, List<Post>> contributions,
     Map<String, String> sendingRequests,
+    String? currentUserAddress,
   ) {
-    final relatedContributions = contributions.where(
-      (contribution) =>
-          contribution.replyId != null && contribution.replyId == post.id,
-    );
+    final relatedContributions = contributions[post.id] ?? [];
     final totalAmount = relatedContributions.fold(
       0.0,
       (sum, contribution) => sum + contribution.txRequest!.amount,
@@ -253,8 +316,16 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
     final totalAmountString = totalAmount.toStringAsFixed(2);
 
     bool wasCrowdfundSuccessful = false;
+    bool isCurrentUserRecipient = false;
+    bool isClaiming = false;
+    bool isClaimed = false;
     if (post.txRequest?.type == TransactionType.crowdfund) {
       wasCrowdfundSuccessful = totalAmount >= post.txRequest!.amount;
+      isCurrentUserRecipient =
+          currentUserAddress != null &&
+          post.txRequest!.address.toLowerCase() == currentUserAddress;
+      isClaiming = _walletState.submittingUserOps;
+      isClaimed = _feedState.claimedCrowdfunds.contains(post.id);
     }
 
     return PostCard(
@@ -310,9 +381,14 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
               timeAgo: '1 hour ago',
               recipientInitials: post.userInitials,
               currentAmount: totalAmountString,
-              status: wasCrowdfundSuccessful
-                  ? 'Crowdfund Successful'
+              status: isClaimed
+                  ? 'Crowdfund Claimed'
+                  : wasCrowdfundSuccessful
+                  ? (isCurrentUserRecipient
+                        ? 'Crowdfund Successful'
+                        : 'Crowdfund Complete')
                   : post.txRequest!.status ?? 'Crowdfund In Progress',
+              isClaiming: isClaiming,
               onBackTap: () {},
               onDeleteTap: () {},
               onContribute: () {
@@ -322,7 +398,9 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
                   post.txRequest!.address,
                 );
               },
-              onClaim: () {},
+              onClaim: () {
+                handleClaim(post.id);
+              },
             )
           : null,
       createdAt: post.createdAt,

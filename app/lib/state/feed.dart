@@ -48,7 +48,9 @@ class FeedState extends ChangeNotifier {
 
   // state variables here - things that are observable by the UI
   final List<Post> posts = [];
-  final List<Post> contributions = [];
+  final Map<String, List<Post>> contributions = {}; // keyed by reply id
+  final Set<String> claimedCrowdfunds =
+      {}; // Track which crowdfunds have been claimed
   bool isLoading = false;
   bool isLoadingMore = false;
   bool isConnected = false;
@@ -72,6 +74,24 @@ class FeedState extends ChangeNotifier {
     }
   }
 
+  UserOp? parseUserOp(List<List<String>> tags) {
+    try {
+      for (var tag in tags) {
+        if (tag[0] == 'tx-intent') {
+          return UserOp.fromJson(json.decode(tag[1]));
+        }
+      }
+    } catch (e) {
+      debugPrint('Error parsing user op: $e');
+    }
+
+    return null;
+  }
+
+  List<UserOp> parseUserOps(List<Post> posts) {
+    return posts.map((post) => post.userOp).whereType<UserOp>().toList();
+  }
+
   Future<void> startListening() async {
     if (_messageSubscription != null) {
       await _messageSubscription!.cancel();
@@ -82,67 +102,65 @@ class FeedState extends ChangeNotifier {
           .listenToEvents(kind: 1, since: _lastLoadedAt)
           .listen(
             (event) {
-              // Check if post already exists to avoid duplicates
-              final existingPostIndex = posts.indexWhere(
-                (existingPost) => existingPost.id == event.id,
-              );
+              if (event.tags.any((tag) => tag[0] == 'e')) {
+                // Handle contribution (reply)
+                final replyId = event.tags.firstWhere(
+                  (tag) => tag[0] == 'e',
+                )[1];
+                final contribution = Post(
+                  id: event.id,
+                  replyId: replyId,
+                  userName: event.pubkey,
+                  userId: event.pubkey,
+                  content: event.content,
+                  txRequest: parseTxRequest(event.tags),
+                  userOp: parseUserOp(event.tags),
+                  createdAt: event.createdAt,
+                  updatedAt: event.createdAt,
+                );
 
-              if (existingPostIndex == -1) {
-                // Add new posts to the beginning of the list
-                if (event.tags.any((tag) => tag[0] == 'e')) {
-                  contributions.insert(
-                    0,
-                    Post(
-                      id: event.id,
-                      replyId: event.tags.firstWhere((tag) => tag[0] == 'e')[1],
-                      userName: event.pubkey,
-                      userId: event.pubkey,
-                      content: event.content,
-                      txRequest: parseTxRequest(event.tags),
-                      createdAt: event.createdAt,
-                      updatedAt: event.createdAt,
-                    ),
-                  );
+                // Initialize list if replyId doesn't exist
+                if (!contributions.containsKey(replyId)) {
+                  contributions[replyId] = [];
+                }
+
+                // Check if contribution already exists
+                final existingIndex = contributions[replyId]!.indexWhere(
+                  (c) => c.id == event.id,
+                );
+
+                if (existingIndex == -1) {
+                  // Add new contribution
+                  contributions[replyId]!.insert(0, contribution);
                 } else {
-                  posts.insert(
-                    0,
-                    Post(
-                      id: event.id,
-                      userName: event.pubkey,
-                      userId: event.pubkey,
-                      content: event.content,
-                      txRequest: parseTxRequest(event.tags),
-                      createdAt: event.createdAt,
-                      updatedAt: event.createdAt,
-                    ),
-                  );
+                  // Update existing contribution
+                  contributions[replyId]![existingIndex] = contribution;
                 }
                 safeNotifyListeners();
               } else {
-                if (event.tags.any((tag) => tag[0] == 'e')) {
-                  contributions[existingPostIndex] = Post(
-                    id: event.id,
-                    replyId: event.tags.firstWhere((tag) => tag[0] == 'e')[1],
-                    userName: event.pubkey,
-                    userId: event.pubkey,
-                    content: event.content,
-                    txRequest: parseTxRequest(event.tags),
-                    createdAt: event.createdAt,
-                    updatedAt: event.createdAt,
-                  );
-                  safeNotifyListeners();
+                // Handle regular post
+                final existingPostIndex = posts.indexWhere(
+                  (existingPost) => existingPost.id == event.id,
+                );
+
+                final post = Post(
+                  id: event.id,
+                  userName: event.pubkey,
+                  userId: event.pubkey,
+                  content: event.content,
+                  txRequest: parseTxRequest(event.tags),
+                  createdAt: event.createdAt,
+                  updatedAt: event.createdAt,
+                );
+
+                if (existingPostIndex == -1) {
+                  // Add new post
+                  posts.insert(0, post);
                 } else {
-                  posts[existingPostIndex] = Post(
-                    id: event.id,
-                    userName: event.pubkey,
-                    userId: event.pubkey,
-                    content: event.content,
-                    txRequest: parseTxRequest(event.tags),
-                    createdAt: event.createdAt,
-                    updatedAt: event.createdAt,
-                  );
-                  safeNotifyListeners();
+                  // Update existing post
+                  posts[existingPostIndex] = post;
                 }
+                safeNotifyListeners();
               }
             },
             onError: (error) {
@@ -179,6 +197,7 @@ class FeedState extends ChangeNotifier {
               userId: event.pubkey,
               content: event.content,
               txRequest: parseTxRequest(event.tags),
+              userOp: parseUserOp(event.tags),
               createdAt: event.createdAt,
               updatedAt: event.createdAt,
             ),
@@ -201,11 +220,12 @@ class FeedState extends ChangeNotifier {
           .toList();
 
       posts.clear();
+      contributions.clear();
       upsertPosts(historicalPosts);
-      upsertPosts(historicalContributions);
+      upsertContributions(historicalContributions);
 
       // Add some mock posts with transactions for testing
-      _addMockPostsWithTransactions();
+      // _addMockPostsWithTransactions();
 
       // If we got less than 20 posts, we've reached the end
       if (historicalPosts.length + historicalContributions.length < limit) {
@@ -228,6 +248,7 @@ class FeedState extends ChangeNotifier {
   Future<void> refreshPosts() async {
     // Clear existing posts and reset pagination state
     posts.clear();
+    contributions.clear();
     hasMorePosts = true;
     safeNotifyListeners();
 
@@ -258,6 +279,7 @@ class FeedState extends ChangeNotifier {
               userId: event.pubkey,
               content: event.content,
               txRequest: parseTxRequest(event.tags),
+              userOp: parseUserOp(event.tags),
               createdAt: event.createdAt,
               updatedAt: event.createdAt,
             ),
@@ -280,10 +302,10 @@ class FeedState extends ChangeNotifier {
           .toList();
 
       upsertPosts(historicalPosts);
-      upsertPosts(historicalContributions);
+      upsertContributions(historicalContributions);
 
       // Add some mock posts with transactions for testing
-      _addMockPostsWithTransactions();
+      // _addMockPostsWithTransactions();
 
       // If we got less than limit posts, we've reached the end
       if (historicalPosts.length + historicalContributions.length < limit) {
@@ -319,29 +341,31 @@ class FeedState extends ChangeNotifier {
       final oldestPost = posts.last;
       final until = oldestPost.createdAt;
 
-      // Load next 20 posts
+      // Load next 20 posts (excluding contributions/replies which have 'e' tags)
       final moreEvents = await _nostrService.requestPastEvents(
         kind: 1,
         limit: limit,
         until: until,
       );
 
-      final moreContributions = moreEvents
-          .where((event) => event.tags.any((tag) => tag[0] == 'e'))
-          .map(
-            (event) => Post(
-              id: event.id,
-              replyId: event.tags.firstWhere((tag) => tag[0] == 'e')[1],
-              userName: event.pubkey,
-              userId: event.pubkey,
-              content: event.content,
-              txRequest: parseTxRequest(event.tags),
-              createdAt: event.createdAt,
-              updatedAt: event.createdAt,
-            ),
-          )
-          .toList();
       if (moreEvents.isNotEmpty) {
+        final moreContributions = moreEvents
+            .where((event) => event.tags.any((tag) => tag[0] == 'e'))
+            .map(
+              (event) => Post(
+                id: event.id,
+                replyId: event.tags.firstWhere((tag) => tag[0] == 'e')[1],
+                userName: event.pubkey,
+                userId: event.pubkey,
+                content: event.content,
+                txRequest: parseTxRequest(event.tags),
+                userOp: parseUserOp(event.tags),
+                createdAt: event.createdAt,
+                updatedAt: event.createdAt,
+              ),
+            )
+            .toList();
+
         final morePosts = moreEvents
             .where((event) => !event.tags.any((tag) => tag[0] == 'e'))
             .map(
@@ -356,8 +380,9 @@ class FeedState extends ChangeNotifier {
               ),
             )
             .toList();
+
         upsertPosts(morePosts);
-        upsertPosts(moreContributions);
+        upsertContributions(moreContributions);
       }
 
       safeNotifyListeners();
@@ -481,11 +506,16 @@ class FeedState extends ChangeNotifier {
         userId: event.pubkey,
         content: event.content,
         txRequest: txRequest,
+        userOp: userop,
         createdAt: event.createdAt,
         updatedAt: event.createdAt,
       );
 
-      contributions.insert(0, contribution);
+      // Add contribution to the map under the reply id
+      if (!contributions.containsKey(id)) {
+        contributions[id] = [];
+      }
+      contributions[id]!.insert(0, contribution);
 
       isLoading = false;
       safeNotifyListeners();
@@ -509,6 +539,44 @@ class FeedState extends ChangeNotifier {
 
     // Sort posts by creation date (most recent first)
     this.posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  }
+
+  void markCrowdfundAsClaimed(String postId) {
+    claimedCrowdfunds.add(postId);
+    safeNotifyListeners();
+  }
+
+  void upsertContributions(List<Post> contributionsList) {
+    for (var contribution in contributionsList) {
+      if (contribution.replyId == null) continue;
+
+      final replyId = contribution.replyId!;
+
+      // Initialize list if replyId doesn't exist
+      if (!contributions.containsKey(replyId)) {
+        contributions[replyId] = [];
+      }
+
+      // Check if contribution already exists
+      final existingIndex = contributions[replyId]!.indexWhere(
+        (c) => c.id == contribution.id,
+      );
+
+      if (existingIndex == -1) {
+        // Add new contribution
+        contributions[replyId]!.add(contribution);
+      } else {
+        // Update existing contribution
+        contributions[replyId]![existingIndex] = contribution;
+      }
+    }
+
+    // Sort contributions by creation date (most recent first) for each post
+    for (var replyId in contributions.keys) {
+      contributions[replyId]!.sort(
+        (a, b) => b.createdAt.compareTo(a.createdAt),
+      );
+    }
   }
 
   /// Reconnect with new settings
@@ -569,105 +637,6 @@ class FeedState extends ChangeNotifier {
       safeNotifyListeners();
       rethrow;
     }
-  }
-
-  void _addMockPostsWithTransactions() {
-    // Add a mock targeted receive post (targeted to current user - they will see fulfill button)
-    final mockTargetedReceivePost = Post(
-      id: 'mock-targeted-receive-post-1',
-      userName: '0x1234567890abcdef1234567890abcdef12345678',
-      userId: '0x1234567890abcdef1234567890abcdef12345678',
-      content:
-          'Hey! Could you help me out with some PYUSD? I need to cover some expenses.',
-      userInitials: 'AC',
-      likeCount: 2,
-      dislikeCount: 0,
-      commentCount: 1,
-      txRequest: TxRequest(
-        username: '0x1234567890abcdef1234567890abcdef12345678',
-        address:
-            '0x1234567890abcdef1234567890abcdef12345678', // Alice's address (from)
-        amount: 50.0,
-        type: TransactionType.request,
-        status: 'Request Pending',
-      ),
-      createdAt: DateTime.now().subtract(const Duration(hours: 2)),
-      updatedAt: DateTime.now().subtract(const Duration(hours: 2)),
-    );
-
-    // Add a mock send post (completed transaction - no fulfill button)
-    final mockSendPost = Post(
-      id: 'mock-send-post-1',
-      userName: '0x9876543210fedcba9876543210fedcba98765432',
-      userId: '0x9876543210fedcba9876543210fedcba98765432',
-      content: 'Sending some PYUSD to my friend for lunch! 🍕',
-      userInitials: 'BT',
-      likeCount: 5,
-      dislikeCount: 0,
-      commentCount: 3,
-      txRequest: TxRequest(
-        username: '0x9876543210fedcba9876543210fedcba98765432',
-        address: '0x9876543210fedcba9876543210fedcba98765432',
-        amount: 25.0,
-        type: TransactionType.send,
-        status: 'Send Complete',
-      ),
-      createdAt: DateTime.now().subtract(const Duration(hours: 1)),
-      updatedAt: DateTime.now().subtract(const Duration(hours: 1)),
-    );
-
-    // Add a mock crowdfund in progress post
-    final mockCrowdfundProgressPost = Post(
-      id: 'mock-crowdfund-progress-1',
-      userName: '0xabcdef1234567890abcdef1234567890abcdef12',
-      userId: '0xabcdef1234567890abcdef1234567890abcdef12',
-      content: 'Help me reach my goal for the community garden project! 🌱',
-      userInitials: 'SF',
-      likeCount: 12,
-      dislikeCount: 0,
-      commentCount: 8,
-      txRequest: TxRequest(
-        username: '0xabcdef1234567890abcdef1234567890abcdef12',
-        address: '0xabcdef1234567890abcdef1234567890abcdef12',
-        amount: 2.0, // Goal amount
-        type: TransactionType.crowdfund,
-        status: 'Crowdfund In Progress',
-        currentAmount: 1.0, // Current progress
-      ),
-      createdAt: DateTime.now().subtract(const Duration(hours: 3)),
-      updatedAt: DateTime.now().subtract(const Duration(hours: 3)),
-    );
-
-    // Add a mock crowdfund successful post
-    final mockCrowdfundSuccessPost = Post(
-      id: 'mock-crowdfund-success-1',
-      userName: '0xfedcba0987654321fedcba0987654321fedcba09',
-      userId: '0xfedcba0987654321fedcba0987654321fedcba09',
-      content:
-          'Thank you everyone! We reached our goal for the art exhibition! 🎨',
-      userInitials: 'MC',
-      likeCount: 25,
-      dislikeCount: 0,
-      commentCount: 15,
-      txRequest: TxRequest(
-        username: '0xfedcba0987654321fedcba0987654321fedcba09',
-        address: '0xfedcba0987654321fedcba0987654321fedcba09',
-        amount: 5.0, // Goal amount
-        type: TransactionType.crowdfund,
-        status: 'Crowdfund Successful',
-        currentAmount: 5.0, // Fully funded
-      ),
-      createdAt: DateTime.now().subtract(const Duration(days: 1)),
-      updatedAt: DateTime.now().subtract(const Duration(days: 1)),
-    );
-
-    // Insert mock posts at the beginning
-    posts.insertAll(0, [
-      mockTargetedReceivePost,
-      mockSendPost,
-      mockCrowdfundProgressPost,
-      mockCrowdfundSuccessPost,
-    ]);
   }
 }
 

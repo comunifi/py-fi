@@ -73,6 +73,12 @@ class WalletState extends ChangeNotifier {
 
   Map<String, String> sendingRequests = {};
 
+  // Batch user op submission progress tracking
+  bool submittingUserOps = false;
+  int submittingUserOpsTotal = 0;
+  int submittingUserOpsCompleted = 0;
+  double submittingUserOpsProgress = 0.0;
+
   Future<void> loadAccount() async {
     try {
       isLoading = true;
@@ -412,5 +418,60 @@ class WalletState extends ChangeNotifier {
     }
 
     return null;
+  }
+
+  Future<void> submitUserOps(List<UserOp> userops) async {
+    try {
+      isLoading = true;
+      submittingUserOps = true;
+      submittingUserOpsTotal = userops.length;
+      submittingUserOpsCompleted = 0;
+      submittingUserOpsProgress = 0.0;
+      safeNotifyListeners();
+
+      // Submit all operations concurrently
+      final futures = userops.map((userop) async {
+        print('Submitting user op...');
+        final txHash = await submitUserop(_config, userop);
+        if (txHash == null) {
+          throw Exception('Failed to submit user op');
+        }
+
+        print('Waiting for tx success...');
+        final success = await waitForTxSuccess(_config, txHash);
+        print('Tx success: $success');
+        if (!success) {
+          throw Exception('Transaction failed');
+        }
+
+        // Update progress as each operation completes
+        submittingUserOpsCompleted++;
+        submittingUserOpsProgress =
+            submittingUserOpsCompleted / submittingUserOpsTotal;
+        print('Progress: $submittingUserOpsProgress');
+        print('Completed: $submittingUserOpsCompleted');
+        print('Total: $submittingUserOpsTotal');
+        safeNotifyListeners();
+      }).toList();
+
+      print('Waiting for all operations to complete...');
+
+      // Wait for all operations to complete
+      await Future.wait(futures);
+
+      print('All operations completed');
+
+      getAccountBalance();
+    } catch (e, s) {
+      debugPrint('Error submitting user ops: $e');
+      debugPrint('Stack trace: $s');
+    } finally {
+      isLoading = false;
+      submittingUserOps = false;
+      submittingUserOpsTotal = 0;
+      submittingUserOpsCompleted = 0;
+      submittingUserOpsProgress = 0.0;
+      safeNotifyListeners();
+    }
   }
 }

@@ -20,6 +20,7 @@ class CrowdfundTransactionCard extends StatelessWidget {
     this.recipientInitials,
     this.currentAmount = '0',
     this.status = 'Crowdfund In Progress',
+    this.isClaiming = false,
     this.onBackTap,
     this.onDeleteTap,
     this.onContribute,
@@ -34,6 +35,7 @@ class CrowdfundTransactionCard extends StatelessWidget {
   final String? recipientInitials;
   final String currentAmount;
   final String status;
+  final bool isClaiming;
   final VoidCallback? onBackTap;
   final VoidCallback? onDeleteTap;
   final VoidCallback? onContribute;
@@ -64,7 +66,8 @@ class CrowdfundTransactionCard extends StatelessWidget {
                         address: recipientAddress,
                         size: AvatarSize.sm,
                         shape: AvatarShape.circular,
-                        fallbackText: recipientInitials ??
+                        fallbackText:
+                            recipientInitials ??
                             AddressUtils.getAddressInitials(recipientAddress),
                       ),
                     )
@@ -72,7 +75,8 @@ class CrowdfundTransactionCard extends StatelessWidget {
                       address: recipientAddress,
                       size: AvatarSize.sm,
                       shape: AvatarShape.circular,
-                      fallbackText: recipientInitials ??
+                      fallbackText:
+                          recipientInitials ??
                           AddressUtils.getAddressInitials(recipientAddress),
                     ),
             ),
@@ -80,7 +84,7 @@ class CrowdfundTransactionCard extends StatelessWidget {
               children: [
                 FlyText('to').text('xs').color('gray500'),
                 FlyText(
-                  AddressUtils.truncateIfAddress(recipientName),
+                  '@${AddressUtils.truncateIfAddress(recipientName)}',
                 ).text('sm').weight('medium').color('gray800'),
               ],
             ).col().gap('s1'),
@@ -91,12 +95,8 @@ class CrowdfundTransactionCard extends StatelessWidget {
         FlyBox(
           children: [
             // Goal info with PayPal image
-            Amount(
-              amount: goalAmount,
-              currency: 'PYUSD',
-              label: 'goal',
-            ),
-            
+            Amount(amount: goalAmount, currency: 'PYUSD', label: 'goal'),
+
             // Progress info
             Amount(
               amount: currentAmount,
@@ -143,20 +143,29 @@ class CrowdfundTransactionCard extends StatelessWidget {
         ],
         if (status == 'Crowdfund Successful') ...[
           FlyButton(
-            onTap: () {
-              print('Claim crowdfund');
-              if (onClaim != null) onClaim!();
-            },
+            onTap: isClaiming
+                ? null
+                : () {
+                    print('Claim crowdfund');
+                    if (onClaim != null) onClaim!();
+                  },
             variant: ButtonVariant.solid,
             buttonColor: ButtonColor.primary,
-            child: FlyText(
-              'Claim',
-            ).text('sm').weight('bold').color('white'),
+            child: isClaiming
+                ? FlyBox(
+                    child: CupertinoActivityIndicator(),
+                  ).row().items('center').justify('center')
+                : FlyText('Claim').text('sm').weight('bold').color('white'),
           ).w('auto').py('s3').rounded('md').mt('s4'),
         ],
         if (status == 'Crowdfund Complete') ...[
           FlyText(
             'Crowdfund Complete',
+          ).text('sm').weight('medium').color('green600').mt('s4'),
+        ],
+        if (status == 'Crowdfund Claimed') ...[
+          FlyText(
+            'Crowdfund Claimed',
           ).text('sm').weight('medium').color('green600').mt('s4'),
         ],
       ],
@@ -168,5 +177,4 @@ class CrowdfundTransactionCard extends StatelessWidget {
     final goal = double.tryParse(goalAmount) ?? 1.0;
     return (current / goal).clamp(0.0, 1.0);
   }
-
 }
