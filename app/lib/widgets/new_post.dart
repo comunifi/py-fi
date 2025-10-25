@@ -46,6 +46,7 @@ class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
   // Transaction state for request functionality
   TransactionEntry? _transaction;
   final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _recipientController = TextEditingController();
   String _mode =
       'none'; // 'send', 'request', 'crowdfund', 'contribute', or 'none'
 
@@ -77,6 +78,7 @@ class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
     _postController.dispose();
     _focusNode.dispose();
     _amountController.dispose();
+    _recipientController.dispose();
     super.dispose();
   }
 
@@ -98,16 +100,22 @@ class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
       );
     } else if (_mode == 'crowdfund' && _transaction != null) {
       final fromProfile = context.read<ProfileState>().fromProfile;
+      final manualRecipient = _recipientController.text.trim();
 
       debugPrint('Crowdfund validation:');
       debugPrint('  fromProfile: $fromProfile');
       debugPrint('  fromProfile?.username: ${fromProfile?.username}');
       debugPrint('  fromProfile?.account: ${fromProfile?.account}');
+      debugPrint('  manualRecipient: $manualRecipient');
       debugPrint('  _transaction.recipient: ${_transaction!.recipient}');
       debugPrint('  _transaction.amount: ${_transaction!.amount}');
 
-      if (fromProfile == null) {
-        debugPrint('Error: Please select a recipient');
+      // Use profile if available, otherwise use manual entry
+      final username = fromProfile?.username ?? manualRecipient;
+      final address = fromProfile?.account ?? manualRecipient;
+
+      if (address.isEmpty) {
+        debugPrint('Error: Please enter a recipient address or username');
         // TODO: Show error to user
         return;
       }
@@ -120,8 +128,8 @@ class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
 
       widget.onCrowdfund!(
         _postController.text,
-        fromProfile.username,
-        fromProfile.account,
+        username,
+        address,
         _transaction!.amount,
       );
       GoRouter.of(context).pop();
@@ -155,6 +163,8 @@ class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
       if (_mode == 'request') {
         _mode = 'none';
         _transaction = null;
+        _recipientController.clear();
+        _amountController.clear();
       } else {
         _mode = 'request';
         _transaction = TransactionEntry(
@@ -162,6 +172,8 @@ class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
           amount: 0.0,
           currency: 'PYUSD',
         );
+        _recipientController.clear();
+        _amountController.clear();
       }
     });
   }
@@ -171,6 +183,8 @@ class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
       if (_mode == 'send') {
         _mode = 'none';
         _transaction = null;
+        _recipientController.clear();
+        _amountController.clear();
       } else {
         _mode = 'send';
         _transaction = TransactionEntry(
@@ -178,6 +192,8 @@ class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
           amount: 0.0,
           currency: 'PYUSD',
         );
+        _recipientController.clear();
+        _amountController.clear();
       }
     });
   }
@@ -187,6 +203,8 @@ class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
       if (_mode == 'crowdfund') {
         _mode = 'none';
         _transaction = null;
+        _recipientController.clear();
+        _amountController.clear();
       } else {
         _mode = 'crowdfund';
         _transaction = TransactionEntry(
@@ -194,6 +212,8 @@ class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
           amount: 0.0,
           currency: 'PYUSD',
         );
+        _recipientController.clear();
+        _amountController.clear();
       }
     });
   }
@@ -319,6 +339,8 @@ class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
         setState(() {
           _mode = 'none';
           _transaction = null;
+          _recipientController.clear();
+          _amountController.clear();
         });
       },
       headerBackgroundColor: 'gray100',
@@ -339,15 +361,27 @@ class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
                     child: FlyBox(
                       children: [
                         CupertinoTextField(
+                          controller: _recipientController,
                           keyboardType: TextInputType.text,
                           style: const TextStyle(fontSize: 14),
                           placeholder: isCrowdfund
-                              ? 'user name'
+                              ? 'address or user name'
                               : 'address or username',
                           onChanged: (value) {
                             context.read<ProfileState>().searchFromProfile(
                               value,
                             );
+                            // Update transaction with manual input
+                            if (isCrowdfund) {
+                              setState(() {
+                                _transaction = TransactionEntry(
+                                  recipient: value.trim(),
+                                  username: null,
+                                  amount: _transaction?.amount ?? 0.0,
+                                  currency: 'PYUSD',
+                                );
+                              });
+                            }
                           },
                         ),
                       ],
@@ -394,7 +428,10 @@ class _SimpleNewPostScreenState extends State<SimpleNewPostScreen> {
                       final amount = double.tryParse(value) ?? 0.0;
                       final recipientValue = isContribute
                           ? (widget.contributeToAddress ?? '')
-                          : (fromProfile?.account ?? '');
+                          : (isCrowdfund
+                                ? (fromProfile?.account ??
+                                      _recipientController.text.trim())
+                                : (fromProfile?.account ?? ''));
                       final usernameValue = isContribute
                           ? widget.contributeToUsername
                           : fromProfile?.username;
