@@ -69,14 +69,16 @@ class _MainAppState extends State<MainApp> {
       themeMode: ThemeMode.system, // shouldn't mix material and cupertino
       themeData: FlyThemeData.withDefaults(),
       appBuilder: (context) {
-        return CupertinoApp.router(
-          debugShowCheckedModeBanner: false,
-          title: 'Comunifi',
-          theme: CupertinoThemeData(
-            primaryColor: const Color(0xFF009686), // Purple theme
-            brightness: Brightness.light,
+        return ScaffoldMessenger(
+          child: CupertinoApp.router(
+            debugShowCheckedModeBanner: false,
+            title: 'Comunifi',
+            theme: CupertinoThemeData(
+              primaryColor: const Color(0xFF009686), // Purple theme
+              brightness: Brightness.light,
+            ),
+            routerConfig: router,
           ),
-          routerConfig: router,
         );
       },
     );

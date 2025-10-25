@@ -1,5 +1,6 @@
 import 'package:app/design/avatar.dart';
 import 'package:app/design/avatar_blockies.dart';
+import 'package:app/design/button.dart';
 import 'package:app/utils/address.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -35,15 +36,14 @@ class TopBar extends StatelessWidget {
         // Copy address button (center-right)
         if (accountAddress != null)
           FlyBox(
-            child: GestureDetector(
+            child: FlyButton(
+              buttonColor: ButtonColor.primary,
+              variant: ButtonVariant.solid,
+              size: ButtonSize.small,
               onTap: () => _copyAddressToClipboard(context),
-              child: FlyBox(
-                children: [
-                  const Icon(Icons.copy, color: Colors.white, size: 18),
-                ],
-              ).px('s2').py('s1').bg('teal600').rounded('md'),
+              child: const Icon(Icons.copy, color: Colors.white, size: 18),
             ),
-          ).justify('center').items('center').right('s12'),
+          ).justify('center').items('center').right('s12').mr('s4'),
 
         // Right side avatar
         FlyBox(
