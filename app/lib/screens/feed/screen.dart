@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:app/models/post.dart';
+import 'package:app/services/wallet/utils.dart';
+import 'package:app/utils/calldata.dart';
+import 'package:app/utils/currency.dart';
 import 'package:app/widgets/new_post.dart';
 import 'package:app/state/feed.dart';
 import 'package:app/state/state.dart';
@@ -16,6 +19,7 @@ import 'package:flutter/material.dart';
 import 'package:flywind/flywind.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:web3dart/crypto.dart';
 
 class SocialFeedScreen extends StatefulWidget {
   const SocialFeedScreen({super.key});
@@ -215,7 +219,10 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
         child: Column(
           children: [
             // Custom header
-            const TopBar(),
+            TopBar(
+              accountAddress: walletState.account?.hexEip55,
+              profile: walletState.profile,
+            ),
             // Scrollable content area
             Expanded(
               child: CustomScrollView(
@@ -309,10 +316,17 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
     String? currentUserAddress,
   ) {
     final relatedContributions = contributions[post.id] ?? [];
-    final totalAmount = relatedContributions.fold(
-      0.0,
-      (sum, contribution) => sum + contribution.txRequest!.amount,
-    );
+    final totalAmount = relatedContributions.fold(0.0, (sum, contribution) {
+      final userop = contribution.userOp;
+      if (userop == null) {
+        return sum;
+      }
+      final transfer = parseNestedERC20Transfer(bytesToHex(userop.callData));
+      if (transfer == null) {
+        return sum;
+      }
+      return sum + double.parse(formatCurrency(transfer.amount.toString(), 6));
+    });
     final totalAmountString = totalAmount.toStringAsFixed(2);
 
     bool wasCrowdfundSuccessful = false;
