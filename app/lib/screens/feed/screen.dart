@@ -164,12 +164,11 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
       debugPrint('No user ops to claim');
       return;
     }
-
-    debugPrint('Claiming ${userOps.length} contributions');
     await _walletState.submitUserOps(userOps);
 
     // Mark the crowdfund as claimed after successful submission
-    _feedState.markCrowdfundAsClaimed(postId);
+    // This will publish a Nostr event so all clients can see it's claimed
+    await _feedState.markCrowdfundAsClaimed(postId);
   }
 
   Future<void> handleContribute(

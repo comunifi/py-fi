@@ -107,6 +107,24 @@ class FeedState extends ChangeNotifier {
                 final replyId = event.tags.firstWhere(
                   (tag) => tag[0] == 'e',
                 )[1];
+
+                // Check if this is a claim event
+                final isClaimEvent = event.tags.any(
+                  (tag) =>
+                      tag[0] == 'crowdfund-claimed' &&
+                      tag.length > 1 &&
+                      tag[1] == 'true',
+                );
+
+                if (isClaimEvent) {
+                  // Mark the crowdfund as claimed
+                  if (!claimedCrowdfunds.contains(replyId)) {
+                    claimedCrowdfunds.add(replyId);
+                    safeNotifyListeners();
+                  }
+                  return; // Don't process claim events as regular contributions
+                }
+
                 final contribution = Post(
                   id: event.id,
                   replyId: replyId,
@@ -189,6 +207,15 @@ class FeedState extends ChangeNotifier {
       );
       final historicalContributions = historicalEvents
           .where((event) => event.tags.any((tag) => tag[0] == 'e'))
+          .where((event) {
+            // Filter out claim events from contributions
+            return !event.tags.any(
+              (tag) =>
+                  tag[0] == 'crowdfund-claimed' &&
+                  tag.length > 1 &&
+                  tag[1] == 'true',
+            );
+          })
           .map(
             (event) => Post(
               id: event.id,
@@ -203,6 +230,25 @@ class FeedState extends ChangeNotifier {
             ),
           )
           .toList();
+
+      // Extract claimed crowdfunds from historical events
+      final claimEvents = historicalEvents
+          .where((event) => event.tags.any((tag) => tag[0] == 'e'))
+          .where(
+            (event) => event.tags.any(
+              (tag) =>
+                  tag[0] == 'crowdfund-claimed' &&
+                  tag.length > 1 &&
+                  tag[1] == 'true',
+            ),
+          )
+          .toList();
+
+      // Mark crowdfunds as claimed from historical data
+      for (final claimEvent in claimEvents) {
+        final replyId = claimEvent.tags.firstWhere((tag) => tag[0] == 'e')[1];
+        claimedCrowdfunds.add(replyId);
+      }
 
       final historicalPosts = historicalEvents
           .where((event) => !event.tags.any((tag) => tag[0] == 'e'))
@@ -271,6 +317,15 @@ class FeedState extends ChangeNotifier {
 
       final historicalContributions = historicalEvents
           .where((event) => event.tags.any((tag) => tag[0] == 'e'))
+          .where((event) {
+            // Filter out claim events from contributions
+            return !event.tags.any(
+              (tag) =>
+                  tag[0] == 'crowdfund-claimed' &&
+                  tag.length > 1 &&
+                  tag[1] == 'true',
+            );
+          })
           .map(
             (event) => Post(
               id: event.id,
@@ -285,6 +340,25 @@ class FeedState extends ChangeNotifier {
             ),
           )
           .toList();
+
+      // Extract claimed crowdfunds from historical events
+      final claimEvents = historicalEvents
+          .where((event) => event.tags.any((tag) => tag[0] == 'e'))
+          .where(
+            (event) => event.tags.any(
+              (tag) =>
+                  tag[0] == 'crowdfund-claimed' &&
+                  tag.length > 1 &&
+                  tag[1] == 'true',
+            ),
+          )
+          .toList();
+
+      // Mark crowdfunds as claimed from historical data
+      for (final claimEvent in claimEvents) {
+        final replyId = claimEvent.tags.firstWhere((tag) => tag[0] == 'e')[1];
+        claimedCrowdfunds.add(replyId);
+      }
 
       final historicalPosts = historicalEvents
           .where((event) => !event.tags.any((tag) => tag[0] == 'e'))
@@ -351,6 +425,15 @@ class FeedState extends ChangeNotifier {
       if (moreEvents.isNotEmpty) {
         final moreContributions = moreEvents
             .where((event) => event.tags.any((tag) => tag[0] == 'e'))
+            .where((event) {
+              // Filter out claim events from contributions
+              return !event.tags.any(
+                (tag) =>
+                    tag[0] == 'crowdfund-claimed' &&
+                    tag.length > 1 &&
+                    tag[1] == 'true',
+              );
+            })
             .map(
               (event) => Post(
                 id: event.id,
@@ -365,6 +448,25 @@ class FeedState extends ChangeNotifier {
               ),
             )
             .toList();
+
+        // Extract claimed crowdfunds from more events
+        final claimEvents = moreEvents
+            .where((event) => event.tags.any((tag) => tag[0] == 'e'))
+            .where(
+              (event) => event.tags.any(
+                (tag) =>
+                    tag[0] == 'crowdfund-claimed' &&
+                    tag.length > 1 &&
+                    tag[1] == 'true',
+              ),
+            )
+            .toList();
+
+        // Mark crowdfunds as claimed from historical data
+        for (final claimEvent in claimEvents) {
+          final replyId = claimEvent.tags.firstWhere((tag) => tag[0] == 'e')[1];
+          claimedCrowdfunds.add(replyId);
+        }
 
         final morePosts = moreEvents
             .where((event) => !event.tags.any((tag) => tag[0] == 'e'))
@@ -541,9 +643,34 @@ class FeedState extends ChangeNotifier {
     this.posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 
-  void markCrowdfundAsClaimed(String postId) {
-    claimedCrowdfunds.add(postId);
-    safeNotifyListeners();
+  /// Publish a claim event to Nostr to mark crowdfund as claimed
+  /// This allows claim status to sync across all clients
+  Future<void> markCrowdfundAsClaimed(String postId) async {
+    try {
+      // Immediately mark as claimed locally for responsive UI
+      claimedCrowdfunds.add(postId);
+      safeNotifyListeners();
+
+      // Publish claim event to Nostr as a reply to the crowdfund post
+      List<List<String>> tags = [
+        ['e', postId], // Reply to the crowdfund post
+        ['crowdfund-claimed', 'true'], // Custom tag to indicate claim
+      ];
+
+      await _nostrService.publishEvent(
+        NostrEventModel.fromPartialData(
+          kind: 1,
+          content: 'Crowdfund claimed', // Content for the claim event
+          tags: tags,
+        ),
+      );
+
+      debugPrint('Claim event published for crowdfund: $postId');
+    } catch (e, s) {
+      debugPrint('Error publishing claim event: $e');
+      debugPrint('Stack trace: $s');
+      // Don't remove from local state even if publish fails - user can see it's claimed locally
+    }
   }
 
   void upsertContributions(List<Post> contributionsList) {

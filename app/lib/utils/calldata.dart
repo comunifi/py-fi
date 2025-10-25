@@ -25,7 +25,6 @@ class ERC20Transfer {
 /// Returns the recipient address and amount, along with the token address from outer function
 ERC20Transfer? parseNestedERC20Transfer(String calldata) {
   try {
-    print('Parsing nested ERC20 transfer from calldata: $calldata');
     // Remove 0x prefix if present
     String data = calldata.startsWith('0x') ? calldata.substring(2) : calldata;
 
