@@ -2,8 +2,6 @@
 
 **Decentralized Communications & Crowdfunding for Communities using PYUSD**
 
-*Nostr + Crypto + PYUSD = Super Simple P2P Crowdfunding* ❤️
-
 ## Overview
 
 Communities constantly need to raise funds — for new initiatives, infrastructure, and shared goals. Today, they coordinate through centralized Web2 platforms (Reddit, Discord, Telegram) while relying on fragmented fintech tools (Venmo, Wise, bank transfers) for payments. This leaves them without control over their data, their funds, and the platforms they depend on. Crypto offers powerful alternatives, but UX friction has kept mainstream communities away.
