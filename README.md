@@ -1,60 +1,55 @@
-# Comunifi - Peer to Peer Crowdfunding with PayPal (PYFI :)
+# Comunifi - Peer to Peer Crowdfunding with PayPal
 
-Nostr + Crypto + PYUSD = Super Simple P2P Crowdfunding ❤️
+**Decentralized Communications & Crowdfunding for Communities using PYUSD**
 
-## Problem
+*Nostr + Crypto + PYUSD = Super Simple P2P Crowdfunding* ❤️
 
-When humans gather around a common purpose (building a new project, sharing content or just solving a common challenge), communication and resource allocation are two key challenges to get right. 
+## Overview
 
-On communication, the most widespread options involve utilizing centralized platforms with a closed data model (discord, whatsapp, telegram, signal, facebook groups). You lose control of your members and your data.
+Communities constantly need to raise funds — for new initiatives, infrastructure, and shared goals. Today, they coordinate through centralized Web2 platforms (Reddit, Discord, Telegram) while relying on fragmented fintech tools (Venmo, Wise, bank transfers) for payments. This leaves them without control over their data, their funds, and the platforms they depend on. Crypto offers powerful alternatives, but UX friction has kept mainstream communities away.
 
-On resource allocation, many user-friendly options have popped up over the years, but people still gravitate towards traditional fintech products. Or, for those who are more open-minded, they need to use very crypto-centric solutions with a ux that is not suited for non-crypto natives.
+**ComuniFi unifies decentralized communication and peer-to-peer crowdfunding in one seamless platform.** Built on Nostr for messaging and coordination, ERC-4337 Account Abstraction for simple wallet interactions, and PYUSD for stable, real world, spendable value — it enables chat-style crowdfunding without smart contracts, custodians, or escrow. Community members can post crowdfunding proposals, contribute to goals, and claim funds directly through familiar social-style interactions — all cryptographically signed and fully non-custodial.
 
-Enter Comunifi's unique take on crowdfunding for your community. No escrow, smart contract, backend or other middleman holding funds. People just send each other stablecoins directly. Communication around this happens through Nostr, a decentralized communication protocol.
+## Key Features
 
-## Solution
+- **🔄 Seamless UX**: Chat-style crowdfunding where Ethereum keys double as Nostr identities — same key, unified identity
+- **⚡ Frictionless Payments**: Contribute and receive PYUSD instantly — no intermediaries, no escrow, just direct stablecoin transfers
+- **🌍 Real-World Utility**: Because PYUSD is PayPal's stablecoin, funds can be spent directly via PayPal checkout, bridging crypto and traditional commerce
+- **🔒 Fully Non-Custodial**: Every action (post, contribute, claim) is signed and verifiable — no contracts, no custodians
 
-We've built a very simple solution which allows posting messages, starting a crowdfund, allowing others to contribute and claiming the contributions. All this by combining nostr and stablecoins. Completely non-custodial and peer to peer.
+## How It's Made
 
-### Blockchain Layer - Arbitrum + ERC4337 Account Abstraction
+ComuniFi is built by combining Nostr's decentralized communication protocol with ERC-4337 account abstraction on Arbitrum, using PYUSD as the native payment medium. The result is a peer-to-peer crowdfunding system that runs without custodians, smart contracts, or centralized servers.
 
-Users sign user operations (ERC4337, which are essentially signed intents to transact) which, if executed, will execute a transfer of funds from the user's account. These are contributions.
+### Core Architecture
 
-Users are essentially signing cheques which live and are gossiped around in nostr. These are independently verifiable (owner, balance, token being transferred) and can be executed out of order. They can also be signed with a specific validity period (execution period from date X to date Y, not before or after). 
+**🔗 Blockchain Layer**: Arbitrum for fast, low-cost settlement of PYUSD transfers
 
-We use Citizen Wallet's bundler to submit user ops. 
+**🔐 Account Abstraction**: ERC-4337 user operations enable gasless and flexible transactions. We used Citizen Wallet's bundler to collect, verify, and batch-submit these user ops
 
-### Social Layer - Nostr
+**💬 Social Layer**: Nostr provides the decentralized messaging layer. We use standard kind 1 messages with structured JSON metadata tags — preserving full compatibility with existing Nostr clients while embedding crowdfund data (goal, destination, user operation)
 
-For messaging and gossiping around the user ops, we use Nostr. With your same ethereum private key, post messages, crowdfunds and contributions through Nostr. 
+**📱 App Layer**: The demo was built with Flutter, allowing the same codebase to run across macOS, iOS, Android, Windows, Linux, and Web. This makes the UX consistent across all platforms
 
-You can post a message with a goal of 10 PYUSD. Others can contribute directly to it by simply signing a user op and submitting it as a reply to the crowdfund post. 
+**🔄 Relay Layer**: A custom Go-based Nostr relay backed by Postgres handles persistence, event indexing, and replay of crowdfund data
 
-Using the user op, we are able to parse out the contribution amount from the metadata (and verify it against the actual call data). Combining this with checking the balance of the contributor allows us to soft validate that the contribution is indeed possible. It is also possible to verify the signature of the owner of the account, we did not implement this yet. Harder validation can be done on the user op if needed.
+### Technical Innovations
 
-Claiming is easy as extracting all user ops from the replies and submitting them. The bundler will batch if possible.
+**🆔 Shared Identity**: Ethereum and Nostr both use the same elliptic curve (secp256k1). We leveraged this to unify signing — your Ethereum private key is also your Nostr identity, creating seamless social + financial integration
 
-### Real World Layer - PYUSD
+**📝 Intent Cheques**: Each contribution is a signed ERC-4337 user operation embedded in a Nostr reply. These operations are verifiable, time-bounded, and retryable, allowing asynchronous, contract-free crowdfunding
 
-We used PYUSD to enable a mix of on-chain and off-chain transactions. We imagined a scenario where multiple people send PYUSD in order for someone to purchase a domain name online using the PayPal checkout flow.
+**📦 Batch Execution**: When a crowdfund is ready to claim, the app aggregates all user ops from Nostr replies and submits them to the Citizen Wallet bundler for gas-optimized batch execution
 
-Stablecoins make a lot of sense as a resource that gets allocated which can then be used for payments.
+**💳 Real-World Utility via PYUSD**: Using PayPal's PYUSD stablecoin makes crypto usable for real-world payments. Contributors can fund a crowdfund in PYUSD, and recipients can spend those funds directly through PayPal checkout — bridging Web3 coordination and Web2 commerce
 
-PayPal's PYUSD stablecoin allows a bridge between Web2 and Web3, where we can send payments across borders to be used locally for purchasing services.
+## Demo Proof
 
-### App - Flutter
+- **Transaction**: [View on Arbiscan](https://arbiscan.io/tx/0xd3a17e143ad9a716debd0b298e9f33a6d043522ea153dee21ecd673d1a43a0d3)
+- **DNS Record**: [View DNS Records](https://www.nslookup.io/domains/comunifi.xyz/dns-records/#cloudflare)
+- **Look for tag**: `eth-global-online-2025:tx-hash:0xd3a17e143ad9a716debd0b298e9f33a6d043522ea153dee21ecd673d1a43a0d3`
 
-The Demo is a macOS application but could be run on Linux, Windows, iOS, Android or even Web if needed. 
-
-We use Flutter for its out of the box support for multiple platforms. 
-
-### Relay - Nostr + Golang + Postgres
-
-The relay is a go application running against a postgres database.
-
-Nostr allows for multiple strategies when it comes to persistance. We chose postgres.
-
-## Demo
+The demo shows real crowdfunding contributions and batch claims executed via the Citizen Wallet bundler, using PYUSD on Arbitrum — proving end-to-end decentralized coordination and real-world payment utility.
 
 ## Getting Started
 
@@ -87,11 +82,3 @@ flutter run -d macos
 ```
 
 Put the ip address you get from ngrok as RELAY_URL.
-
-### Submission
-
-[>>transaction from the demo<<](https://arbiscan.io/tx/0xd3a17e143ad9a716debd0b298e9f33a6d043522ea153dee21ecd673d1a43a0d3)
-
-[>>we added a txt record to the domain we bought<<](https://www.nslookup.io/domains/comunifi.xyz/dns-records/#cloudflare)
-
-look for `eth-global-online-2025:tx-hash:0xd3a17e143ad9a716debd0b298e9f33a6d043522ea153dee21ecd673d1a43a0d3` >> proving that we could only have added this after our transaction for our submission.
